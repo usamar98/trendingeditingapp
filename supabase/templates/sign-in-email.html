@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+  <body style="margin:0;padding:32px 20px;background:#f7f5ef;color:#253d36;font-family:Arial,sans-serif;line-height:1.6">
+    <main style="max-width:480px;margin:auto">
+      <p style="font-weight:700">EditingApp</p>
+      <h1 style="font-family:Georgia,serif;font-size:30px;line-height:1.2">Your ticket to the 80s.</h1>
+      <p>Use this link to verify your email and sign in:</p>
+      <p><a href="{{ if .RedirectTo }}{{ .RedirectTo }}{{ else }}{{ .SiteURL }}/auth/callback{{ end }}?token_hash={{ .TokenHash }}&amp;type=email" style="display:inline-block;background:#253d36;color:#fff;padding:12px 22px;border-radius:8px;text-decoration:none">Sign in to EditingApp</a></p>
+      <p>Or enter this code in the browser where you started:</p>
+      <p style="font-size:28px;letter-spacing:5px;font-weight:700">{{ .Token }}</p>
+      <p>Use either the link or the code once. After signing in, review your selfie and choose Generate. Opening the email does not generate a portrait.</p>
+      <p style="font-size:14px">If you did not request this email, you can ignore it.</p>
+    </main>
+  </body>
+</html>

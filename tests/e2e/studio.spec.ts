@@ -159,7 +159,7 @@ test("fixture-backed verified email flow and failed generation recovery", async 
   await upload(page);
   await page.getByRole("button", { name: "Create my retro portrait" }).click();
   await page.getByLabel("Email address").fill("test@example.com");
-  await page.getByRole("button", { name: "Send my code" }).click();
+  await page.getByRole("button", { name: "Send sign-in email" }).click();
   await page.getByLabel("Code from your email").fill("123456");
   await page.getByRole("button", { name: "Verify email", exact: true }).click();
   await expect(page.getByRole("dialog")).not.toBeVisible();
@@ -173,6 +173,142 @@ test("fixture-backed verified email flow and failed generation recovery", async 
   await expect(
     page.getByRole("button", { name: "Generate my retro portrait" }),
   ).toBeEnabled();
+});
+test("fixture-backed link sign-in updates the original upload tab without another email", async ({
+  page,
+  context,
+}) => {
+  let signedIn = false;
+  let emails = 0;
+  let generations = 0;
+  await context.route("**/api/session", (route) =>
+    route.fulfill({
+      json: {
+        configured: true,
+        user: signedIn ? { email: "test@example.com" } : null,
+        remaining: 3,
+      },
+    }),
+  );
+  await page.route("**/api/auth", (route) => {
+    emails++;
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.route("**/api/portraits", (route) => {
+    generations++;
+    return route.fulfill({
+      json: {
+        id: "b827395f-a85b-48a4-83dd-106a7348a7f6",
+        status: "failed",
+        preset: "studio",
+      },
+    });
+  });
+  await page.goto("/");
+  await upload(page);
+  await page.getByRole("button", { name: "Create my retro portrait" }).click();
+  await page.getByLabel("Email address").fill("test@example.com");
+  await page.getByRole("button", { name: "Send sign-in email" }).click();
+  await expect(
+    page.getByRole("button", { name: "I opened the email link" }),
+  ).toBeVisible();
+  const a11y = await new AxeBuilder({ page })
+    .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+    .analyze();
+  expect(a11y.violations).toEqual([]);
+  // The real SDK/cookie handoff is separately tested in auth-session.test.ts.
+  // This fixture represents the callback returning with a saved session.
+  signedIn = true;
+  const emailTab = await context.newPage();
+  await emailTab.goto("/?auth=success#studio");
+  await expect(emailTab.getByRole("status")).toContainText("You’re signed in");
+  await expect(emailTab).toHaveURL(/\/#studio$/);
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await expect(page.getByText("Selfie ready. Change photo?")).toBeVisible();
+  await expect(page.getByRole("checkbox")).toBeChecked();
+  expect(generations).toBe(0);
+  await page.bringToFront();
+  await page
+    .getByRole("button", { name: "Generate my retro portrait" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "This portrait didn’t develop." }),
+  ).toBeVisible();
+  expect(generations).toBe(1);
+  expect(emails).toBe(1);
+});
+
+test("fixture-backed Generate refreshes a stale signed-out session before opening the email dialog", async ({
+  page,
+}) => {
+  let signedIn = false;
+  let generations = 0;
+  let emailRequests = 0;
+  await page.route("**/api/session", (route) =>
+    route.fulfill({
+      json: {
+        configured: true,
+        user: signedIn ? { email: "test@example.com" } : null,
+        remaining: 3,
+      },
+    }),
+  );
+  await page.route("**/api/auth", (route) => {
+    emailRequests++;
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.route("**/api/portraits", (route) => {
+    generations++;
+    return route.fulfill({
+      json: {
+        id: "b827395f-a85b-48a4-83dd-106a7348a7f6",
+        status: "failed",
+        preset: "studio",
+      },
+    });
+  });
+  await page.goto("/");
+  await upload(page);
+  signedIn = true; // No focus or cross-tab event: force the pre-generation check.
+  await page.getByRole("button", { name: "Create my retro portrait" }).click();
+  await expect(
+    page.getByRole("heading", { name: "This portrait didn’t develop." }),
+  ).toBeVisible();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  expect(generations).toBe(1);
+  expect(emailRequests).toBe(0);
+});
+
+test("legacy email return is handled, strips its code and shows actionable expiry errors", async ({
+  page,
+  request,
+}) => {
+  await session(page, false);
+  let callbacks = 0;
+  await page.route("**/auth/callback?code=fixture-old-email-code", (route) => {
+    callbacks++;
+    return route.fulfill({
+      status: 303,
+      headers: { location: "/?auth=expired#studio" },
+    });
+  });
+  await page.goto("/?code=fixture-old-email-code");
+  await expect(page.locator('.error[role="alert"]')).toContainText(
+    "sign-in link is invalid or expired",
+  );
+  await expect(page).toHaveURL(/\/#studio$/);
+  expect(callbacks).toBe(1);
+  const response = await request.get(
+    "/auth/callback?type=recovery&token_hash=invalid",
+    { maxRedirects: 0 },
+  );
+  expect(response.status()).toBe(303);
+  expect(response.headers()["location"]).toBe(
+    "http://localhost:3001/?auth=expired#studio",
+  );
+  expect(response.headers()["cache-control"]).toContain("no-store");
+  expect(response.headers()["referrer-policy"]).toBe("no-referrer");
+  expect(response.headers()["x-robots-tag"]).toBe("noindex, nofollow");
 });
 test("fixture-backed connection loss reconnects by status, without a second POST", async ({
   page,

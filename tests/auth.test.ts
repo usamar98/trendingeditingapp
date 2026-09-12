@@ -53,7 +53,11 @@ describe("email authentication error handling", () => {
     expect(fake.send).toHaveBeenCalledTimes(1);
     expect(fake.send).toHaveBeenCalledWith({
       email: "person@example.com",
-      options: { shouldCreateUser: true, captchaToken: undefined },
+      options: {
+        shouldCreateUser: true,
+        captchaToken: undefined,
+        emailRedirectTo: "http://localhost:3001/auth/callback",
+      },
     });
     expect(console.error).not.toHaveBeenCalled();
   });

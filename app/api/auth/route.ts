@@ -1,4 +1,4 @@
-import { sameOrigin } from "@/lib/server/config";
+import { appUrl, sameOrigin } from "@/lib/server/config";
 import { authClient, admin } from "@/lib/server/supabase";
 import { createHash } from "node:crypto";
 import { readBody } from "@/lib/server/upload";
@@ -39,7 +39,11 @@ export async function POST(request: Request) {
         throw reservationFailure(reservation.error, reservation.status);
       const { error } = await client.auth.signInWithOtp({
         email: body.email,
-        options: { shouldCreateUser: true, captchaToken: body.captchaToken },
+        options: {
+          shouldCreateUser: true,
+          captchaToken: body.captchaToken,
+          emailRedirectTo: new URL("/auth/callback", appUrl()).href,
+        },
       });
       if (error) throw emailSendFailure(error);
     } else if (body.action === "verify") {

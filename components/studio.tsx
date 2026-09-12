@@ -24,6 +24,16 @@ import {
   type Quality,
 } from "@/lib/presets";
 import { downloadComparison, downloadFile } from "@/lib/download";
+import { AUTH_MESSAGES, readAuthReturn } from "@/lib/auth-return";
+const SESSION_EVENT = "editingapp-session-updated";
+function notifySessionChanged() {
+  try {
+    // Only a change notification; credentials and email stay out of localStorage.
+    localStorage.setItem(SESSION_EVENT, crypto.randomUUID());
+  } catch {
+    // Focus and pre-generation checks also refresh the session.
+  }
+}
 type Session = {
   configured: boolean;
   user: { email: string } | null;
@@ -60,6 +70,7 @@ export default function Studio() {
   const [session, setSession] = useState<Session | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [checkingSession, setCheckingSession] = useState(false);
   const [validating, setValidating] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
@@ -70,20 +81,33 @@ export default function Studio() {
   const [sent, setSent] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [authNotice, setAuthNotice] = useState("");
   const [compare, setCompare] = useState<"side" | "slider">("side");
   const [slider, setSlider] = useState(50);
   const input = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const submitLock = useRef(false);
   const validationId = useRef(0);
+  const sessionVersion = useRef(0);
   const activeStyle = PRESETS.find((p) => p.id === preset)!;
   const jobStyle = PRESETS.find((p) => p.id === result?.preset) || activeStyle;
   const refreshSession = useCallback(async () => {
-    const data = await readJson(
+    const version = ++sessionVersion.current;
+    const data = (await readJson(
       await fetch("/api/session", { cache: "no-store" }),
-    );
-    setSession(data);
-    return data as Session;
+    )) as Session;
+    if (version === sessionVersion.current) {
+      setSession(data);
+      if (data.user) {
+        setAuthOpen(false);
+        setAuthError("");
+        setToken("");
+        setSent(false);
+      } else {
+        setAuthNotice("");
+      }
+    }
+    return data;
   }, []);
   const acceptResult = useCallback((data: Result) => {
     setResult(data);
@@ -101,26 +125,61 @@ export default function Studio() {
     [acceptResult],
   );
   useEffect(() => {
-    fetch("/api/session", { cache: "no-store" })
-      .then(readJson)
-      .then((data: Session) => {
-        setSession(data);
-        const saved = localStorage.getItem("editingapp-request");
-        if (saved && /^[0-9a-f-]{36}$/i.test(saved) && data.user) {
-          setPendingId(saved);
-          checkStatus(saved).catch(() =>
-            setError(
-              "Your previous request could not be loaded. Use Check request to reconnect.",
-            ),
+    async function initialize() {
+      const authReturn = readAuthReturn(window.location.href);
+      if (authReturn.handled)
+        window.history.replaceState(null, "", authReturn.cleanUrl);
+      if (authReturn.callback) {
+        window.location.replace(authReturn.callback);
+        return;
+      }
+      const data = await refreshSession();
+      if (authReturn.outcome) {
+        if (data.user) {
+          setAuthNotice(
+            "You’re signed in. Choose your selfie to create a portrait.",
+          );
+          notifySessionChanged();
+        } else {
+          setError(
+            AUTH_MESSAGES[authReturn.outcome] ||
+              "Your sign-in session was not saved. Allow cookies and open the newest email in this browser, or enter its code.",
           );
         }
-      })
-      .catch(() =>
-        setError(
-          "Could not check your allowance. Refresh the page to reconnect.",
-        ),
-      );
+      }
+      const saved = localStorage.getItem("editingapp-request");
+      if (saved && /^[0-9a-f-]{36}$/i.test(saved) && data.user) {
+        setPendingId(saved);
+        checkStatus(saved).catch(() =>
+          setError(
+            "Your previous request could not be loaded. Use Check request to reconnect.",
+          ),
+        );
+      }
+    }
+    initialize().catch(() =>
+      setError(
+        "Could not check your allowance. Refresh the page to reconnect.",
+      ),
+    );
   }, [refreshSession, checkStatus]);
+  useEffect(() => {
+    const sync = () => {
+      if (document.visibilityState === "visible")
+        refreshSession().catch(() => {});
+    };
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === SESSION_EVENT) refreshSession().catch(() => {});
+    };
+    window.addEventListener("focus", sync);
+    document.addEventListener("visibilitychange", sync);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("focus", sync);
+      document.removeEventListener("visibilitychange", sync);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [refreshSession]);
   useEffect(() => {
     if (authOpen) dialog.current?.showModal();
     else dialog.current?.close();
@@ -132,7 +191,10 @@ export default function Studio() {
     [preview],
   );
   const processing =
-    busy || result?.status === "reserved" || result?.status === "processing";
+    checkingSession ||
+    busy ||
+    result?.status === "reserved" ||
+    result?.status === "processing";
   useEffect(() => {
     if (!pendingId || !processing) return;
     let failures = 0;
@@ -206,10 +268,32 @@ export default function Studio() {
       );
       if (action === "send") setSent(true);
       else {
-        await refreshSession();
+        const updated = await refreshSession();
+        if (!updated.user)
+          throw new Error(
+            "Your sign-in session was not saved. Allow cookies and try signing in again.",
+          );
         setAuthOpen(false);
         setToken("");
+        setAuthNotice("You’re signed in. Your selfie is ready to generate.");
+        notifySessionChanged();
       }
+    } catch (cause) {
+      setAuthError((cause as Error).message);
+    } finally {
+      setAuthBusy(false);
+    }
+  }
+  async function checkEmailLink() {
+    setAuthBusy(true);
+    setAuthError("");
+    try {
+      const updated = await refreshSession();
+      if (!updated.user)
+        throw new Error(
+          "No sign-in found in this browser yet. Open the email link here, or enter the code from your email.",
+        );
+      setAuthNotice("You’re signed in. Your selfie is ready to generate.");
     } catch (cause) {
       setAuthError((cause as Error).message);
     } finally {
@@ -223,15 +307,26 @@ export default function Studio() {
       setError("Choose your selfie and confirm photo permission first.");
       return;
     }
-    if (!session?.configured) {
-      setError(
-        "Portrait generation is not connected yet. Your selfie stays in your browser until you generate.",
-      );
+    submitLock.current = true;
+    setCheckingSession(true);
+    try {
+      // Email links may open another tab. Check the saved cookies before asking
+      // for another email, even if this tab missed a focus/storage notification.
+      const current = await refreshSession();
+      if (!current.configured)
+        throw new Error(
+          "Portrait generation is not connected yet. Your selfie stays in your browser until you generate.",
+        );
+      if (!current.user) {
+        setAuthOpen(true);
+        return;
+      }
+    } catch (cause) {
+      setError((cause as Error).message);
       return;
-    }
-    if (!session.user) {
-      setAuthOpen(true);
-      return;
+    } finally {
+      submitLock.current = false;
+      setCheckingSession(false);
     }
     if (pendingId && !retry) {
       setError(
@@ -483,7 +578,12 @@ export default function Studio() {
             )}
             onClick={() => generate()}
           >
-            {processing ? (
+            {checkingSession ? (
+              <>
+                <LoaderCircle className="spin" size={18} /> Checking your
+                sign-in…
+              </>
+            ) : processing ? (
               <>
                 <LoaderCircle className="spin" size={18} /> Developing your
                 portrait…
@@ -498,6 +598,11 @@ export default function Studio() {
               </>
             )}
           </button>
+          {authNotice && (
+            <p className="small-label" role="status">
+              {authNotice}
+            </p>
+          )}
           <p className="cost-note">
             1 portrait from your daily allowance ·{" "}
             {session?.user
@@ -521,6 +626,7 @@ export default function Studio() {
                     setFile(null);
                     setPreview("");
                     await refreshSession();
+                    notifySessionChanged();
                   } catch (cause) {
                     setError((cause as Error).message);
                   }
@@ -792,6 +898,11 @@ export default function Studio() {
           />
           {sent && (
             <>
+              <p className="small-label" role="status">
+                Check your inbox and spam folder. Open the sign-in link in this
+                browser, or enter the code if your email includes one. We’ll
+                check your sign-in when you return here.
+              </p>
               <label htmlFor="token">Code from your email</label>
               <input
                 id="token"
@@ -804,7 +915,6 @@ export default function Studio() {
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
               />
-              <p className="small-label">Check your inbox and spam folder.</p>
             </>
           )}
           {authError && (
@@ -813,18 +923,43 @@ export default function Studio() {
             </p>
           )}
           <button className="primary" disabled={authBusy}>
-            {authBusy ? "Please wait…" : sent ? "Verify email" : "Send my code"}
+            {authBusy
+              ? "Please wait…"
+              : sent
+                ? "Verify email"
+                : "Send sign-in email"}
           </button>
           {sent && (
             <button
               type="button"
               className="text-button"
+              disabled={authBusy}
+              onClick={checkEmailLink}
+            >
+              I opened the email link
+            </button>
+          )}
+          {!sent && (
+            <button
+              type="button"
+              className="text-button"
+              disabled={authBusy || !email}
+              onClick={() => setSent(true)}
+            >
+              Enter an existing code
+            </button>
+          )}
+          {sent && (
+            <button
+              type="button"
+              className="text-button"
+              disabled={authBusy}
               onClick={() => {
                 setSent(false);
                 setToken("");
               }}
             >
-              Use another email or request a new code
+              Use another email or request a new email
             </button>
           )}
         </form>

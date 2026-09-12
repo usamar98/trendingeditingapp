@@ -6,7 +6,7 @@ Native **Next.js 16.3.5 + TypeScript**, Supabase Auth/Postgres/private Storage, 
 
 - Responsive, indexable landing page and three presets: 80s Studio, Retro Cinema, Vintage Family Album.
 - Local selfie preview, JPG/PNG/WebP validation, server decoding, dimension/pixel/size limits and EXIF removal.
-- Email OTP sign-in, three daily portrait allowances, a 50-attempt daily site cap, and bounded email-send attempts.
+- Email link or OTP sign-in with a server cookie session, three daily portrait allowances, a 50-attempt daily site cap, and bounded email-send attempts.
 - Private originals/results, generation states, reload recovery, comparison slider and side-by-side views.
 - Portrait download, browser-composed labeled before-and-after PNG, manual deletion and expiry cleanup.
 - Sitemap, robots, canonical metadata, WebApplication JSON-LD, Open Graph image, privacy and terms pages.
@@ -40,8 +40,8 @@ All variables are server-side. Nothing uses `NEXT_PUBLIC_*`. Generation delibera
 ## Supabase setup
 
 1. Create a Supabase project in an appropriate region. Apply **both migrations in filename order** from `supabase/migrations/` using the SQL editor, or link the Supabase CLI project and run `supabase db push`. Existing installations need only `202609120002_fal_provider.sql`; it preserves the provider identity on legacy jobs and defaults new jobs to fal.
-2. Enable email authentication and signup; disable anonymous sign-ins. Configure the Auth site URL to `APP_URL`.
-3. Set **both the Confirm signup and Magic Link email templates** to display the OTP: `<p>Your EditingApp code is: <strong>{{ .Token }}</strong></p>`. The UI accepts 6–8 digits and verifies with type `email`. Configure OTP expiry and email-send limits in Supabase.
+2. Enable email authentication and signup; disable anonymous sign-ins. Under **Authentication → URL Configuration**, set **Site URL** to the production `APP_URL`. Add the exact **Redirect URL** `https://your-domain.com/auth/callback` (replace the domain). For the local preview also add `http://localhost:3001/auth/callback`; add `http://localhost:3000/auth/callback` only if you run that port. Each deployment's `APP_URL` must match the origin used to open it, including `www` if applicable.
+3. In **Authentication → Email Templates**, paste the contents of [`supabase/templates/sign-in-email.html`](supabase/templates/sign-in-email.html) into **both Confirm signup and Magic Link**. Suggested subject: **Your EditingApp sign-in link and code**. This is an HTML email template, not SQL. It uses `.RedirectTo` (the callback URL sent by the app), `.TokenHash` for the sign-in link and `.Token` for the code. The custom link can sign in the browser/device where it is opened; alternatively enter the code in the original browser. Using either consumes the same one-time credential. The UI accepts 6–8 digits and verifies with type `email`. Configure expiry and email-send limits in Supabase. No new migration is required for this login fix.
 4. Configure production SMTP with a verified sender. Supabase's development email service is not appropriate for public arbitrary-recipient signup. Test both new and existing accounts.
 5. Confirm the `portraits` bucket is **private**. The migration applies restrictive policies denying browser access even if other bucket policies exist. All photo requests pass through authenticated server routes. Job metadata RLS allows users to read only their own records; mutations and reservation RPCs are service-role only.
 6. Optional automatic cleanup: set `CRON_SECRET` and schedule `GET /api/cron/cleanup` **hourly** with `Authorization: Bearer <CRON_SECRET>`. On Vercel, add the configuration below using a plan that supports hourly jobs; alternatively use an external scheduler. Monitor non-200 responses. The endpoint deletes up to 100 jobs per invocation and reports `morePossible`. Without a configured scheduler, generation still works and photo access still expires after 24 hours, but files and job metadata remain stored until deleted manually or by the operator.
@@ -89,6 +89,8 @@ These commands are read-only and use `FAL_KEY` from `.env.local`. They return ca
 
 For email sign-in errors, see [email troubleshooting](docs/AUTH_TROUBLESHOOTING.md) and run the read-only checks in `supabase/diagnostics/email-auth.sql`. Missing database setup is reported separately from genuine email limits.
 
+The `/auth/callback` route supports both the default Supabase email link's PKCE code and the custom template's token hash. It saves the session in HttpOnly cookies and redirects to a URL without credentials. Older links returning to `/?code=…` are forwarded to the callback. Default PKCE links require the browser that requested the email; the custom template's link can be opened in a different browser. Other tabs refresh their session when notified or focused, and Generate checks the server session before requesting another email. Signing in never automatically generates a portrait. Unsupported legacy implicit-flow token fragments are cleared with a sign-in instruction rather than copied into browser storage.
+
 ```sh
 npm run lint
 npm run typecheck
@@ -97,6 +99,6 @@ npm run build
 npm run test:e2e
 ```
 
-Browser tests use installed Chrome and port 3001, with desktop/mobile viewports. They exercise local validation and unavailable configuration against the actual app, then deliberately intercept Auth/generation responses to test success, failure, connection loss, comparison and both downloads. Vitest validates the provider wire contract, server-side upload decoding, generation lifecycle, and the exact SQL migration using PGlite PostgreSQL. This does not replace a hosted Supabase/storage/auth integration test.
+Browser tests use installed Chrome and port 3001, with desktop/mobile viewports. They exercise local validation and unavailable configuration against the actual app, then deliberately intercept Auth/generation responses to test success, failure, connection loss, comparison and both downloads. Auth regressions cover cross-tab login, stale sessions, legacy return URLs and expired links. Vitest also runs the real Supabase SDK and cookie adapter against mocked HTTP, checking the PKCE verifier, session-cookie attributes and authenticated server access. Other suites validate the provider wire contract, server-side upload decoding, generation lifecycle, and the exact SQL migration using PGlite PostgreSQL. This does not replace a hosted Supabase/storage/auth integration test.
 
 See [verification record](docs/VERIFICATION.md) for executed results and remaining limits.
