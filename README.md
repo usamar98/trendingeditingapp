@@ -32,9 +32,10 @@ On PowerShell use `Copy-Item .env.example .env.local`. Set the values below in `
 | `SUPABASE_ANON_KEY`         | Supabase publishable/anon key used on the server for Auth.                                                                  |
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role for protected database and storage operations. Never expose to the browser.                                    |
 | `APP_URL`                   | Exact public origin, e.g. `https://your-domain.com`. Used for canonical metadata and same-origin checks. No trailing slash. |
-| `CRON_SECRET`               | Random secret of at least 32 bytes for the cleanup endpoint.                                                                |
 
 All variables are server-side. Nothing uses `NEXT_PUBLIC_*`. Generation deliberately fails closed if any required setting is absent.
+
+`CRON_SECRET` is **optional** and is not required for generation, sign-in, downloads or manual photo deletion. Set a random secret of at least 32 bytes only when enabling automatic cleanup. If unset, `/api/cron/cleanup` returns 401 and cannot be called anonymously. The default deployment has no cron schedule.
 
 ## Supabase setup
 
@@ -43,11 +44,17 @@ All variables are server-side. Nothing uses `NEXT_PUBLIC_*`. Generation delibera
 3. Set **both the Confirm signup and Magic Link email templates** to display the OTP: `<p>Your EditingApp code is: <strong>{{ .Token }}</strong></p>`. The UI accepts 6–8 digits and verifies with type `email`. Configure OTP expiry and email-send limits in Supabase.
 4. Configure production SMTP with a verified sender. Supabase's development email service is not appropriate for public arbitrary-recipient signup. Test both new and existing accounts.
 5. Confirm the `portraits` bucket is **private**. The migration applies restrictive policies denying browser access even if other bucket policies exist. All photo requests pass through authenticated server routes. Job metadata RLS allows users to read only their own records; mutations and reservation RPCs are service-role only.
-6. Schedule cleanup **hourly**. `GET /api/cron/cleanup` requires `Authorization: Bearer <CRON_SECRET>`. `vercel.json` contains the hourly schedule; use a plan that supports that frequency or an external scheduler. Access expires after 24 hours even if cleanup is delayed. Monitor non-200 responses. The endpoint deletes up to 100 jobs per invocation and reports `morePossible`.
+6. Optional automatic cleanup: set `CRON_SECRET` and schedule `GET /api/cron/cleanup` **hourly** with `Authorization: Bearer <CRON_SECRET>`. On Vercel, add the configuration below using a plan that supports hourly jobs; alternatively use an external scheduler. Monitor non-200 responses. The endpoint deletes up to 100 jobs per invocation and reports `morePossible`. Without a configured scheduler, generation still works and photo access still expires after 24 hours, but files and job metadata remain stored until deleted manually or by the operator.
+
+To enable Vercel cleanup, replace the default empty `vercel.json` with:
+
+```json
+{ "crons": [{ "path": "/api/cron/cleanup", "schedule": "0 * * * *" }] }
+```
 
 Migration limits: three non-failed allowances/user/UTC day, ten total attempts/user/day, fifty total attempts/site/day, one active job/user, and three OTP send attempts/address/hour plus thirty site-wide/hour. User and site quotas are atomically reserved in PostgreSQL, not memory. Editing photo deletion never refunds a spent allowance. Confirmed pre-provider/provider failures release it; unknown outcomes retain it.
 
-Auth-email hashes persist up to one day and are pruned on subsequent email attempts. Job metadata is purged after 30 days by cleanup. To delete an account: remove its photo objects through the Storage API, remove its job rows, then delete the Auth user. A foreign-key restriction prevents accidental Auth deletion from silently orphaning photos.
+Auth-email hashes older than one day are pruned on subsequent email attempts. With scheduled cleanup enabled, expired job metadata is purged after 30 days; otherwise it remains until operator deletion. To delete an account: remove its photo objects through the Storage API, remove its job rows, then delete the Auth user. A foreign-key restriction prevents accidental Auth deletion from silently orphaning photos.
 
 ## Deployment
 
@@ -55,7 +62,7 @@ Use a Node-compatible Next.js host (for example Vercel) with image-processing su
 
 1. Import this directory/repository. Set the environment variables for production and any preview environment; each needs its own exact `APP_URL`.
 2. Install with `npm ci --include=dev`; build with `npm run build`; start with `npm run start` for a long-running Node host. Keep the process alive through request completion. Do not use a host that terminates image requests after a short timeout.
-3. Run the Supabase migrations, set SMTP/templates, and enable the hourly cleanup schedule. Configure fal credits, account spending controls and alerts.
+3. Run the Supabase migrations and set SMTP/templates. Enable the optional hourly cleanup schedule if you want automatic deletion; this is the only feature requiring `CRON_SECRET`. Configure fal credits, account spending controls and alerts.
 4. Configure the canonical domain **before building**, then rebuild after changing it. Add the operator’s privacy-contact details to the privacy page before public launch.
 5. With credentials enabled, run a consented selfie through every preset, confirm likeness/quality and actual billed cost in fal, download both formats, reload during processing, and test private access from a second account. Trigger a controlled provider rejection and verify allowance handling. This live acceptance pass remains outstanding.
 

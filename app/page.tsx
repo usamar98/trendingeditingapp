@@ -30,7 +30,7 @@ const faqs = [
   ],
   [
     "What happens to my photo?",
-    "Before you generate, your selfie is only previewed in your browser. When you submit, EditingApp sends it through fal to an OpenAI image model and stores a metadata-stripped copy and the result in private Supabase storage. Access expires after 24 hours; scheduled cleanup removes the files. You can delete them sooner after processing. Separate provider retention policies apply; see Photo privacy.",
+    "Before you generate, your selfie is only previewed in your browser. When you submit, EditingApp sends it through fal to an OpenAI image model and stores a metadata-stripped copy and the result in private Supabase storage. Access expires after 24 hours. Automatic deletion requires scheduled cleanup; without it, files remain privately stored until deleted. You can delete your photos after processing. Separate provider retention policies apply; see Photo privacy.",
   ],
   [
     "Can I download a before-and-after image?",

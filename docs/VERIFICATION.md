@@ -7,7 +7,7 @@ Completed locally on 12 September 2026 using Node 22.14.0 and Next.js 16.3.5.
 | Production `next build` | Passed; landing, legal pages, metadata routes and OG card prerendered; authenticated APIs remain dynamic. |
 | ESLint | Passed. |
 | TypeScript `tsc --noEmit` | Passed. |
-| Vitest | **33 tests passed** across six suites, including fal transport and catalog discovery. |
+| Vitest | **34 tests passed** across six suites, including fal transport, catalog discovery and optional cleanup configuration. |
 | Chrome desktop/mobile | **8 tests passed** across desktop 1440px and emulated iPhone 13 viewports. |
 | Automated accessibility | No axe WCAG A/AA violations in tested landing/upload/error and generated-result states on both viewports. This is not a complete manual accessibility certification. |
 | Image assets | Three local WebP demonstrations, approximately 57 KB, 70 KB and 74 KB, with dimensions reserved. |
@@ -19,6 +19,7 @@ Completed locally on 12 September 2026 using Node 22.14.0 and Next.js 16.3.5.
 - Real upload-decoder logic: valid image normalization, metadata removal, spoofed MIME, corrupt content, SVG, oversized body without Content-Length, and undersized image rejection.
 - Both exact SQL migrations in PGlite PostgreSQL: duplicate/concurrent reservations, conflict detection, active-job protection, daily allowances, failure-credit release, preservation of allowance state after deletion, client mutation/RPC privilege restrictions, private bucket configuration, legacy OpenAI provenance and fal defaults for new jobs.
 - Server routes with injected dependency fakes: origin and authentication checks, validation before reservation, dispatch only on a fresh reservation, owner-scoped download lookup, no-store downloads, expired and incomplete image rejection.
+- Optional cleanup configuration: generation is configured without `CRON_SECRET`; missing and incorrect cleanup credentials still return 401. The default Vercel configuration schedules no cron jobs.
 - Generation lifecycle with fake provider/storage: original/result persistence, output validation, success/deletion, confirmed failure vs uncertain timeout, pre-dispatch storage failure and saved-result recovery without another provider call.
 - fal adapter with mocked HTTP: exact Sunburst endpoint and JSON fields, inline reference/output, server authentication, privacy/retry headers, bounded streaming responses, missing credentials, rejected remote/malformed outputs, unknown feature rejection and HTTP 408/422/429/503 classification. No automatic retries or provider fallback.
 - Read-only fal catalog with mocked HTTP: official query parameters, pagination, exact-endpoint OpenAPI expansion, account pricing lookup, unavailable pricing and sanitized errors. The real CLI help and missing-key failure were also executed; authenticated catalog discovery was not possible without FAL_KEY.

@@ -23,6 +23,7 @@ vi.mock("@/lib/server/jobs", async (original) => {
 });
 import { POST } from "@/app/api/portraits/route";
 import { GET } from "@/app/api/portraits/[id]/image/route";
+import { GET as cleanup } from "@/app/api/cron/cleanup/route";
 const id = "b827395f-a85b-48a4-83dd-106a7348a7f6";
 const job = {
   id,
@@ -62,6 +63,24 @@ async function form(valid = true) {
   return data;
 }
 describe("HTTP route boundaries", () => {
+  it("keeps cleanup locked when its optional secret is absent or incorrect", async () => {
+    for (const secret of ["", "correct-cleanup-secret"]) {
+      vi.stubEnv("CRON_SECRET", secret);
+      for (const authorization of [
+        "",
+        "Bearer ",
+        "Bearer wrong-cleanup-secret",
+      ]) {
+        const response = await cleanup(
+          new Request("http://localhost:3001/api/cron/cleanup", {
+            headers: { authorization },
+          }),
+        );
+        expect(response.status).toBe(401);
+      }
+    }
+    vi.unstubAllEnvs();
+  });
   it("validates upload before reservation and generates only a fresh reservation", async () => {
     const invalid = await POST(
       new Request("http://localhost:3001/api/portraits", {

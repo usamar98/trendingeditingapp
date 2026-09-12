@@ -24,4 +24,4 @@ The model-search command queries fal's documented platform catalog, can retrieve
 
 ## Remaining acceptance work
 
-`FAL_KEY`, Supabase credentials and deployed cleanup configuration are needed for a live run. Mocked HTTP tests verify the integration contract; they do not prove endpoint access, paid generation quality, operational latency or actual retention. A funded, consented live run and hosted Supabase ownership/deletion checks remain necessary.
+`FAL_KEY` and Supabase credentials are needed for a live run. `CRON_SECRET` and a deployed scheduler are optional and only needed for automatic cleanup; otherwise stored files require manual deletion. Mocked HTTP tests verify the integration contract; they do not prove endpoint access, paid generation quality, operational latency or actual retention. A funded, consented live run and hosted Supabase ownership/deletion checks remain necessary.

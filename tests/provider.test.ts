@@ -139,16 +139,16 @@ describe("fal API adapter contract (mocked network)", () => {
     });
     expect(fetch).not.toHaveBeenCalled();
   });
-  it("requires fal configuration without requiring a direct OpenAI key", () => {
+  it("enables generation without cron or direct OpenAI keys, but still requires fal", () => {
     for (const name of [
       "SUPABASE_URL",
       "SUPABASE_ANON_KEY",
       "SUPABASE_SERVICE_ROLE_KEY",
       "APP_URL",
-      "CRON_SECRET",
     ])
       vi.stubEnv(name, "configured");
     vi.stubEnv("OPENAI_API_KEY", "");
+    vi.stubEnv("CRON_SECRET", "");
     expect(configured()).toBe(true);
     vi.stubEnv("FAL_KEY", "");
     expect(configured()).toBe(false);

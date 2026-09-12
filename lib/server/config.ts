@@ -6,8 +6,7 @@ export function configured() {
     process.env.SUPABASE_URL &&
     process.env.SUPABASE_ANON_KEY &&
     process.env.SUPABASE_SERVICE_ROLE_KEY &&
-    process.env.APP_URL &&
-    process.env.CRON_SECRET,
+    process.env.APP_URL,
   );
 }
 export function requireConfig() {

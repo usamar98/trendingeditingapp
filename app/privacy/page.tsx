@@ -36,19 +36,22 @@ export default function Privacy() {
         <p>
           You must verify your email to generate or retrieve your photos.
           Downloads go through the server and require the same account. Photo
-          access expires 24 hours after submission. An hourly cleanup task
-          removes expired files, normally within the following hour. If cleanup
-          fails, access remains blocked and deletion runs again when the task
-          recovers. You can use “Delete photos now” after processing; an
-          uncertain request may require a six-minute wait to avoid racing an
-          active upload.
+          access expires 24 hours after submission. When hourly cleanup is
+          enabled, it removes expired files, normally within the following hour.
+          Without scheduled cleanup, expired files remain privately stored until
+          you or the operator delete them. If cleanup fails, access remains
+          blocked and deletion resumes when it recovers. You can use “Delete
+          photos now” after processing; an uncertain request may require a
+          six-minute wait to avoid racing an active upload.
         </p>
         <p>
-          Minimal request metadata is retained for up to 30 days for
-          duplicate-request protection and usage control. Deleting photos does
-          not restore spent allowance. Your authentication email remains in
-          Supabase until the operator deletes your account. The operator must
-          delete private storage objects before deleting an authentication user.
+          Minimal request metadata supports duplicate-request protection and
+          usage control. Cleanup removes expired records older than 30 days;
+          without cleanup, they remain until the operator removes them. Deleting
+          photos does not restore spent allowance. Your authentication email
+          remains in Supabase until the operator deletes your account. The
+          operator must delete private storage objects before deleting an
+          authentication user.
         </p>
         <h2>Provider processing and retention</h2>
         <p>
