@@ -34,6 +34,53 @@ async function reserve(id: string, uid = user, fingerprint = id) {
   return q.rows[0].result;
 }
 describe("atomic usage and idempotency migration", () => {
+  it("atomically limits email attempts per address and denies client access to the guard", async () => {
+    const results = await Promise.allSettled(
+      Array.from({ length: 4 }, () =>
+        db.query("select reserve_auth_email($1)", ["same-address-hash"]),
+      ),
+    );
+    expect(
+      results.filter((result) => result.status === "fulfilled"),
+    ).toHaveLength(3);
+    expect(
+      results.filter((result) => result.status === "rejected"),
+    ).toHaveLength(1);
+    const privileges = await db.query<{
+      client_can_reserve: boolean;
+      server_can_reserve: boolean;
+    }>(
+      "select has_function_privilege('authenticated','reserve_auth_email(text)','EXECUTE') as client_can_reserve, has_function_privilege('service_role','reserve_auth_email(text)','EXECUTE') as server_can_reserve",
+    );
+    expect(privileges.rows[0]).toEqual({
+      client_can_reserve: false,
+      server_can_reserve: true,
+    });
+    expect(
+      results.find((result) => result.status === "rejected")?.reason,
+    ).toMatchObject({ code: "P0001", message: "LIMIT" });
+    const diagnostics = await db.exec(
+      fs.readFileSync("supabase/diagnostics/email-auth.sql", "utf8"),
+    );
+    expect(diagnostics[0].rows[0]).toEqual({
+      email_attempts_table_exists: true,
+      email_reservation_function_exists: true,
+      server_can_reserve_email: true,
+    });
+  });
+  it("enforces the site email cap and frees allowance after the rolling hour", async () => {
+    for (let i = 0; i < 27; i++)
+      await db.query("select reserve_auth_email($1)", [`other-address-${i}`]);
+    await expect(
+      db.query("select reserve_auth_email('new-address')"),
+    ).rejects.toThrow("LIMIT");
+    await db.query(
+      "update auth_attempts set created_at=now()-interval '61 minutes'",
+    );
+    await expect(
+      db.query("select reserve_auth_email('same-address-hash')"),
+    ).resolves.toBeDefined();
+  });
   it("preserves legacy provenance while defaulting new reservations to fal", async () => {
     const legacy = await db.query<{ provider: string; provider_model: string }>(
       "select provider,provider_model from portrait_jobs where fingerprint='legacy'",

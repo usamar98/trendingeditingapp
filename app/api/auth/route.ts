@@ -3,6 +3,7 @@ import { authClient, admin } from "@/lib/server/supabase";
 import { createHash } from "node:crypto";
 import { readBody } from "@/lib/server/upload";
 import { AppError, errorResponse } from "@/lib/errors";
+import { reservationFailure, emailSendFailure } from "@/lib/server/auth-errors";
 export async function POST(request: Request) {
   try {
     sameOrigin(request);
@@ -35,21 +36,12 @@ export async function POST(request: Request) {
         p_email_hash: emailHash,
       });
       if (reservation.error)
-        throw new AppError(
-          "AUTH_LIMIT",
-          "Email verification is temporarily limited. Please try again later.",
-          429,
-        );
+        throw reservationFailure(reservation.error, reservation.status);
       const { error } = await client.auth.signInWithOtp({
         email: body.email,
         options: { shouldCreateUser: true, captchaToken: body.captchaToken },
       });
-      if (error)
-        throw new AppError(
-          "AUTH_SEND",
-          "The code could not be sent. Wait a minute and try again, or contact the site owner.",
-          429,
-        );
+      if (error) throw emailSendFailure(error);
     } else if (body.action === "verify") {
       if (typeof body.token !== "string" || !/^\d{6,8}$/.test(body.token))
         throw new AppError("TOKEN", "Enter the code from your email.");

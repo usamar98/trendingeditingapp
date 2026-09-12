@@ -87,6 +87,8 @@ These commands are read-only and use `FAL_KEY` from `.env.local`. They return ca
 
 ## Verification
 
+For email sign-in errors, see [email troubleshooting](docs/AUTH_TROUBLESHOOTING.md) and run the read-only checks in `supabase/diagnostics/email-auth.sql`. Missing database setup is reported separately from genuine email limits.
+
 ```sh
 npm run lint
 npm run typecheck
