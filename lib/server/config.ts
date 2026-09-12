@@ -1,5 +1,6 @@
 import "server-only";
 import { AppError } from "@/lib/errors";
+import { siteOrigin } from "@/lib/site";
 export function configured() {
   return Boolean(
     process.env.FAL_KEY &&
@@ -18,7 +19,7 @@ export function requireConfig() {
     );
 }
 export function appUrl() {
-  return process.env.APP_URL || "http://localhost:3000";
+  return siteOrigin();
 }
 export function sameOrigin(request: Request) {
   if (request.headers.get("origin") !== new URL(appUrl()).origin)

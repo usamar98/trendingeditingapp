@@ -1,25 +1,26 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { appUrl } from "@/lib/server/config";
+import { pageMetadata } from "@/lib/seo";
 export const metadata: Metadata = {
+  ...pageMetadata(
+    "AI Retro Portrait Generator — 1980s Photos",
+    "Turn your selfie into an 80s AI portrait. Choose studio, cinema or vintage album styling, compare your face, and download your portrait and before-and-after.",
+    "/",
+  ),
   metadataBase: new URL(appUrl()),
   title: {
     default: "AI Retro Portrait Generator — 1980s Photos | EditingApp",
     template: "%s | EditingApp",
   },
-  description:
-    "Turn a selfie into an 80s studio portrait, cinematic retro photo, or vintage album keepsake. Choose a style, compare your AI portrait, and download with EditingApp.",
-  alternates: { canonical: "/" },
-  openGraph: {
-    title: "Your face. A different decade. | EditingApp",
-    description:
-      "Create a retro portrait from your selfie. Three styles, one nostalgic trip.",
-    type: "website",
-    siteName: "EditingApp",
-    locale: "en_US",
+  verification: process.env.GOOGLE_SITE_VERIFICATION
+    ? { google: process.env.GOOGLE_SITE_VERIFICATION.trim() }
+    : undefined,
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large" },
   },
-  twitter: { card: "summary_large_image" },
-  robots: { index: true, follow: true },
 };
 export default function RootLayout({
   children,

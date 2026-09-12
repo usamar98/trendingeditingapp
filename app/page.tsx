@@ -10,7 +10,9 @@ import {
 import { Header, Footer } from "@/components/chrome";
 import Studio from "@/components/studio";
 import { PRESETS } from "@/lib/presets";
-import { appUrl } from "@/lib/server/config";
+import { siteUrl } from "@/lib/site";
+import { jsonLd } from "@/lib/seo";
+import { GuideCards } from "@/components/guide-cards";
 const faqs = [
   [
     "What is an AI retro portrait?",
@@ -42,23 +44,53 @@ const faqs = [
   ],
 ];
 export default function Home() {
-  const structured = {
-    "@context": "https://schema.org",
-    "@type": "WebApplication",
-    name: "EditingApp AI Retro Portrait Generator",
-    url: appUrl(),
-    applicationCategory: "PhotographyApplication",
-    operatingSystem: "Web browser",
-    description:
-      "Create an AI retro portrait from a reference selfie, compare it with the original, and download the result.",
-    featureList: [
-      "80s Studio",
-      "Retro Cinema",
-      "Vintage Family Album",
-      "Original and result comparison",
-      "Portrait and before-and-after downloads",
-    ],
-  };
+  const structured = [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "@id": siteUrl("/#organization"),
+      name: "EditingApp",
+      url: siteUrl(),
+      description:
+        "EditingApp creates AI retro portraits from reference selfies.",
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "@id": siteUrl("/#website"),
+      name: "EditingApp",
+      url: siteUrl(),
+      publisher: { "@id": siteUrl("/#organization") },
+      inLanguage: "en",
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      name: "EditingApp AI Retro Portrait Generator",
+      "@id": siteUrl("/#app"),
+      url: siteUrl(),
+      publisher: { "@id": siteUrl("/#organization") },
+      isAccessibleForFree: true,
+      offers: {
+        "@type": "Offer",
+        price: 0,
+        priceCurrency: "USD",
+        description:
+          "Initial release: 3 attempts per verified email per day, subject to a shared site limit. No payment collected.",
+      },
+      applicationCategory: "PhotographyApplication",
+      operatingSystem: "Web browser",
+      description:
+        "Create an AI retro portrait from a reference selfie, compare it with the original, and download the result.",
+      featureList: [
+        "80s Studio",
+        "Retro Cinema",
+        "Vintage Family Album",
+        "Original and result comparison",
+        "Portrait and before-and-after downloads",
+      ],
+    },
+  ];
   return (
     <>
       <Header />
@@ -66,22 +98,23 @@ export default function Home() {
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(structured).replace(/</g, "\\u003c"),
+            __html: jsonLd(structured),
           }}
         />
         <section className="intro">
           <div className="intro-copy">
             <p className="eyebrow">
-              <span /> A LITTLE NOSTALGIA. A LOT OF YOU.
+              <span /> AI RETRO PORTRAIT GENERATOR
             </p>
             <h1>
               Your face.
               <br />
-              <span>A different decade.</span>
+              <span>An 80s AI portrait.</span>
             </h1>
             <p className="intro-description">
-              Meet your 1980s alter ego. Turn a selfie into a retro portrait
-              with the hair, the light, and all the feeling.
+              Turn your selfie into a realistic 1980s-style photo. Choose
+              studio, cinema or vintage album styling, compare your face, and
+              keep your favorite.
             </p>
           </div>
           <div className="intro-aside">
@@ -159,7 +192,7 @@ export default function Home() {
                 <div className="gallery-image">
                   <Image
                     src={p.image}
-                    alt={`AI-created ${p.name} demonstration with ${i === 0 ? "voluminous hair, cream blazer and blue studio background" : i === 1 ? "burgundy clothing and dramatic teal and amber lighting" : "knitwear and warm window light"}`}
+                    alt={`AI-created ${p.name} demo: ${i === 0 ? "cream blazer, big hair and blue backdrop" : i === 1 ? "burgundy clothing with teal and amber lighting" : "knitwear and warm window light"}`}
                     fill
                     sizes="(max-width: 700px) 90vw, 33vw"
                   />
@@ -208,6 +241,15 @@ export default function Home() {
               Create your own retro portrait <ArrowUpRight size={17} />
             </a>
           </div>
+        </section>
+        <section className="home-guides" aria-labelledby="guides-heading">
+          <div className="section-title">
+            <p className="eyebrow">A LITTLE HELP WITH YOUR THROWBACK</p>
+            <h2 id="guides-heading">
+              80s photo ideas. Better starting points.
+            </h2>
+          </div>
+          <GuideCards />
         </section>
         <section className="faq-section" id="faq">
           <div>

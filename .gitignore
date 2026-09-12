@@ -7,3 +7,5 @@ test-results/
 *.tsbuildinfo
 .sites-runtime/
 work/
+.seo-cache/
+deliverables/

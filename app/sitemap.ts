@@ -1,9 +1,8 @@
 import type { MetadataRoute } from "next";
-import { appUrl } from "@/lib/server/config";
+import { PUBLIC_PAGES, siteUrl } from "@/lib/site";
 export default function sitemap(): MetadataRoute.Sitemap {
-  return ["", "/privacy", "/terms"].map((path) => ({
-    url: `${appUrl()}${path}`,
-    changeFrequency: "monthly",
-    priority: path ? 0.3 : 1,
+  return PUBLIC_PAGES.map(({ path, updated }) => ({
+    url: siteUrl(path),
+    lastModified: updated,
   }));
 }

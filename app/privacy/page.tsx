@@ -1,11 +1,10 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { Header, Footer } from "@/components/chrome";
-export const metadata: Metadata = {
-  title: "Photo privacy",
-  description:
-    "How EditingApp processes and deletes your selfie and AI retro portraits.",
-  alternates: { canonical: "/privacy" },
-};
+export const metadata = pageMetadata(
+  "Photo Privacy & Deletion",
+  "Understand how EditingApp handles selfies and AI portraits, private photo access, provider processing, retention and your photo deletion controls.",
+  "/privacy",
+);
 export default function Privacy() {
   return (
     <>

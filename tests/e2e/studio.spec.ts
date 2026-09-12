@@ -29,7 +29,7 @@ test("landing, mobile layout, indexable SEO, invalid upload and accessibility", 
 }, info) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Your face.A different decade.",
+    "Your face.An 80s AI portrait.",
   );
   await expect(page.getByText("Generation is awaiting setup.")).toBeVisible();
   await page.getByRole("radio", { name: /Retro Cinema/ }).check();

@@ -12,7 +12,7 @@ export function Header() {
       <nav aria-label="Main navigation">
         <Link href="/#how-it-works">How it works</Link>
         <Link href="/#styles">The styles</Link>
-        <Link href="/#faq">FAQs</Link>
+        <Link href="/guides">Photo guides</Link>
       </nav>
       <Link className="header-cta" href="/#studio">
         Make a little history <ArrowUpRight size={17} />
@@ -29,6 +29,9 @@ export function Footer() {
       </Link>
       <p>New memories. Old-school feeling.</p>
       <div>
+        <Link href="/guides">Guides</Link>
+        <Link href="/about">About</Link>
+        <Link href="/#faq">FAQs</Link>
         <Link href="/privacy">Photo privacy</Link>
         <Link href="/terms">Terms</Link>
         <span>© {new Date().getUTCFullYear()} EditingApp</span>

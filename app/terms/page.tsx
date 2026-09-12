@@ -1,11 +1,10 @@
-import type { Metadata } from "next";
+import { pageMetadata } from "@/lib/seo";
 import { Header, Footer } from "@/components/chrome";
-export const metadata: Metadata = {
-  title: "Terms of use",
-  description:
-    "EditingApp portrait generation, usage allowances, and responsible photo sharing.",
-  alternates: { canonical: "/terms" },
-};
+export const metadata = pageMetadata(
+  "Terms of Use & Portrait Allowances",
+  "Read EditingApp’s terms for AI retro portraits: photo permissions, daily usage allowances, downloads, responsible sharing and generation limitations.",
+  "/terms",
+);
 export default function Terms() {
   return (
     <>

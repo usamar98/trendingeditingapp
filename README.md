@@ -9,7 +9,8 @@ Native **Next.js 16.3.5 + TypeScript**, Supabase Auth/Postgres/private Storage, 
 - Email link or OTP sign-in with a server cookie session, three daily portrait allowances, a 50-attempt daily site cap, and bounded email-send attempts.
 - Private originals/results, generation states, reload recovery, comparison slider and side-by-side views.
 - Portrait download, browser-composed labeled before-and-after PNG, manual deletion and expiry cleanup.
-- Sitemap, robots, canonical metadata, WebApplication JSON-LD, Open Graph image, privacy and terms pages.
+- Seven public pages with canonical metadata, sitemap, robots, Open Graph previews, WebSite/WebApplication and guide Article/breadcrumb structured data.
+- Original retro prompt and selfie guides, an About page, and an exportable [Search Console kit](docs/search-console/README.md) for updating the existing property after the feature change.
 
 **Live generation is not enabled in this checkout.** No fal/Supabase secrets were available. Demo images are labeled illustrations. Tests use fixtures and mocks explicitly; there is no production mock-mode switch.
 
@@ -33,7 +34,7 @@ On PowerShell use `Copy-Item .env.example .env.local`. Set the values below in `
 | `SUPABASE_SERVICE_ROLE_KEY` | Service role for protected database and storage operations. Never expose to the browser.                                    |
 | `APP_URL`                   | Exact public origin, e.g. `https://your-domain.com`. Used for canonical metadata and same-origin checks. No trailing slash. |
 
-All variables are server-side. Nothing uses `NEXT_PUBLIC_*`. Generation deliberately fails closed if any required setting is absent.
+All variables are server-side. Nothing uses `NEXT_PUBLIC_*`. Generation deliberately fails closed if any required setting is absent. Optional `GOOGLE_SITE_VERIFICATION` accepts Google's HTML-tag content value; keep your existing DNS/file verification if already verified. SEO changes require no new Supabase migration. See the [SEO implementation and research](docs/SEO_IMPLEMENTATION.md).
 
 `CRON_SECRET` is **optional** and is not required for generation, sign-in, downloads or manual photo deletion. Set a random secret of at least 32 bytes only when enabling automatic cleanup. If unset, `/api/cron/cleanup` returns 401 and cannot be called anonymously. The default deployment has no cron schedule.
 
