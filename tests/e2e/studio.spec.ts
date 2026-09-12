@@ -238,6 +238,93 @@ test("fixture-backed link sign-in updates the original upload tab without anothe
   expect(emails).toBe(1);
 });
 
+test("fixture-backed email limit pauses resends but permits an existing code", async ({
+  page,
+}) => {
+  await session(page, false);
+  let sends = 0;
+  let verifications = 0;
+  await page.route("**/api/auth", async (route) => {
+    if (route.request().postDataJSON().action === "send") {
+      sends++;
+      return route.fulfill({
+        status: 429,
+        json: {
+          code: "AUTH_SEND_LIMIT",
+          error:
+            "Email sending is temporarily limited. Use an unused link or code you already received, or try later. If this continues, contact the site owner.",
+        },
+      });
+    }
+    verifications++;
+    await session(page);
+    return route.fulfill({ json: { ok: true } });
+  });
+  await page.goto("/");
+  await upload(page);
+  await page.getByRole("button", { name: "Create my retro portrait" }).click();
+  await page.getByLabel("Email address").fill("test@example.com");
+  await page.getByRole("button", { name: "Send sign-in email" }).click();
+  await expect(page.getByRole("dialog").getByRole("alert")).toContainText(
+    "unused link or code",
+  );
+  await expect(
+    page.getByRole("button", { name: "Send sign-in email" }),
+  ).toBeDisabled();
+  await expect(page.getByText(/Provider limits may last longer/)).toBeVisible();
+  await page.getByRole("button", { name: "Enter an existing code" }).click();
+  await page.getByLabel("Code from your email").fill("123456");
+  await expect(
+    page.getByRole("button", { name: "Verify email", exact: true }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Verify email", exact: true }).click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  expect(sends).toBe(1);
+  expect(verifications).toBe(1);
+});
+
+test("fixture-backed resend countdown ends without sending automatically", async ({
+  page,
+}) => {
+  await page.clock.install();
+  await session(page, false);
+  let sends = 0;
+  let completeSend: (() => Promise<void>) | undefined;
+  await page.route("**/api/auth", (route) => {
+    sends++;
+    completeSend = async () => {
+      await route.fulfill({ json: { ok: true } });
+    };
+  });
+  await page.goto("/");
+  await upload(page);
+  await page.getByRole("button", { name: "Create my retro portrait" }).click();
+  await page.getByLabel("Email address").fill("test@example.com");
+  await page.getByRole("button", { name: "Send sign-in email" }).click();
+  await expect.poll(() => sends).toBe(1);
+  // Bypass the disabled button to exercise the synchronous submit lock.
+  await page.locator(".auth-dialog form").evaluate((form) => {
+    form.dispatchEvent(
+      new Event("submit", { bubbles: true, cancelable: true }),
+    );
+    form.dispatchEvent(
+      new Event("submit", { bubbles: true, cancelable: true }),
+    );
+  });
+  await completeSend!();
+  await page
+    .getByRole("button", { name: "Use another email or request a new email" })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Send sign-in email" }),
+  ).toBeDisabled();
+  await page.clock.fastForward(61_000);
+  await expect(
+    page.getByRole("button", { name: "Send sign-in email" }),
+  ).toBeEnabled();
+  expect(sends).toBe(1);
+});
+
 test("fixture-backed Generate refreshes a stale signed-out session before opening the email dialog", async ({
   page,
 }) => {

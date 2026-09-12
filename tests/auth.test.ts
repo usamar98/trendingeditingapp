@@ -110,6 +110,8 @@ describe("email authentication error handling", () => {
   );
   it.each([
     ["over_email_send_rate_limit", 429, "AUTH_SEND_LIMIT", 429],
+    ["over_request_rate_limit", 429, "AUTH_REQUEST_LIMIT", 429],
+    [undefined, 429, "AUTH_REQUEST_LIMIT", 429],
     ["email_address_not_authorized", 400, "AUTH_EMAIL_SETUP", 503],
     ["otp_disabled", 422, "AUTH_EMAIL_SETUP", 503],
     ["email_address_invalid", 422, "EMAIL", 400],
@@ -126,6 +128,31 @@ describe("email authentication error handling", () => {
       expect(fake.send).toHaveBeenCalledTimes(1);
     },
   );
+  it("logs the safe provider limit code and offers existing-email recovery without retrying", async () => {
+    fake.send.mockResolvedValue({
+      error: {
+        code: "over_email_send_rate_limit",
+        status: 429,
+        message: "private-person@example.com private-token",
+      },
+    });
+    const response = await send();
+    const body = await response.json();
+    expect(body.error).toContain("unused link or code");
+    expect(body.error).toContain("site owner");
+    expect(fake.send).toHaveBeenCalledTimes(1);
+    expect(console.error).toHaveBeenCalledWith(
+      "EditingApp authentication unavailable",
+      {
+        stage: "email_send",
+        category: "email_send_limit",
+        code: "over_email_send_rate_limit",
+      },
+    );
+    expect(
+      JSON.stringify([body, vi.mocked(console.error).mock.calls]),
+    ).not.toContain("private-");
+  });
   it("can verify an existing code without another reservation or email send", async () => {
     expect(
       (

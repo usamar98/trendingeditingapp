@@ -80,6 +80,7 @@ export default function Studio() {
   const [token, setToken] = useState("");
   const [sent, setSent] = useState(false);
   const [authBusy, setAuthBusy] = useState(false);
+  const [resendWait, setResendWait] = useState(0);
   const [authError, setAuthError] = useState("");
   const [authNotice, setAuthNotice] = useState("");
   const [compare, setCompare] = useState<"side" | "slider">("side");
@@ -87,6 +88,8 @@ export default function Studio() {
   const input = useRef<HTMLInputElement>(null);
   const dialog = useRef<HTMLDialogElement>(null);
   const submitLock = useRef(false);
+  const authLock = useRef(false);
+  const sendReadyAt = useRef(0);
   const validationId = useRef(0);
   const sessionVersion = useRef(0);
   const activeStyle = PRESETS.find((p) => p.id === preset)!;
@@ -184,6 +187,16 @@ export default function Studio() {
     if (authOpen) dialog.current?.showModal();
     else dialog.current?.close();
   }, [authOpen]);
+  const coolingDown = resendWait > 0;
+  useEffect(() => {
+    if (!coolingDown) return;
+    const timer = setInterval(() => {
+      setResendWait(
+        Math.max(0, Math.ceil((sendReadyAt.current - Date.now()) / 1000)),
+      );
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [coolingDown]);
   useEffect(
     () => () => {
       if (preview) URL.revokeObjectURL(preview);
@@ -256,8 +269,17 @@ export default function Studio() {
     }
   }
   async function authenticate(action: "send" | "verify") {
+    if (authLock.current) return;
+    if (action === "send" && Date.now() < sendReadyAt.current) return;
+    authLock.current = true;
     setAuthError("");
     setAuthBusy(true);
+    if (action === "send") {
+      // A UI pause reduces accidental sends. Supabase and SQL still enforce
+      // the actual quotas; this countdown does not predict their reset time.
+      sendReadyAt.current = Date.now() + 60_000;
+      setResendWait(60);
+    }
     try {
       await readJson(
         await fetch("/api/auth", {
@@ -281,6 +303,7 @@ export default function Studio() {
     } catch (cause) {
       setAuthError((cause as Error).message);
     } finally {
+      authLock.current = false;
       setAuthBusy(false);
     }
   }
@@ -922,7 +945,16 @@ export default function Studio() {
               {authError}
             </p>
           )}
-          <button className="primary" disabled={authBusy}>
+          {coolingDown && (
+            <p className="small-label">
+              Wait {resendWait}s before another email request. Provider limits
+              may last longer. You can enter an existing code during this pause.
+            </p>
+          )}
+          <button
+            className="primary"
+            disabled={authBusy || (!sent && coolingDown)}
+          >
             {authBusy
               ? "Please wait…"
               : sent

@@ -38,7 +38,8 @@ function report(
     code &&
     (DATABASE_SETUP_CODES.has(code) ||
       DATABASE_ACCESS_CODES.has(code) ||
-      EMAIL_SETUP_CODES.has(code));
+      EMAIL_SETUP_CODES.has(code) ||
+      EMAIL_LIMIT_CODES.has(code));
   // Log only known codes/categories. Never include email, hash, key, URL or raw error body.
   console.error("EditingApp authentication unavailable", {
     stage,
@@ -88,12 +89,22 @@ export function reservationFailure(
 }
 
 export function emailSendFailure(error: AuthFailure): AppError {
-  if (EMAIL_LIMIT_CODES.has(error.code || "") || error.status === 429)
+  if (error.code === "over_email_send_rate_limit") {
+    report("email_send", "email_send_limit", error.code);
     return new AppError(
       "AUTH_SEND_LIMIT",
-      "The email service has reached its sending limit. Please wait before requesting another code.",
+      "Email sending is temporarily limited. Use an unused link or code you already received, or try later. If this continues, contact the site owner.",
       429,
     );
+  }
+  if (error.code === "over_request_rate_limit" || error.status === 429) {
+    report("email_send", "auth_request_limit", error.code);
+    return new AppError(
+      "AUTH_REQUEST_LIMIT",
+      "Too many sign-in requests. Pause before trying again. You can still try an unused link or code from your inbox.",
+      429,
+    );
+  }
   if (EMAIL_SETUP_CODES.has(error.code || "")) {
     report("email_send", "email_setup", error.code);
     return new AppError(
