@@ -2,29 +2,13 @@ import "server-only";
 import Stripe from "stripe";
 import { creditsEnabled } from "./config";
 import { AppError } from "@/lib/errors";
-import {
-  PLANS,
-  type BillingInterval,
-  type PlanId,
-  planAmount,
-} from "@/lib/plans";
+import { type BillingInterval, type PlanId, planAmount } from "@/lib/plans";
 
-export function stripePriceId(plan: PlanId, interval: BillingInterval) {
-  return process.env[
-    `STRIPE_PRICE_${plan.toUpperCase()}_${interval.toUpperCase()}`
-  ];
-}
 export function billingConfigured() {
   return Boolean(
     creditsEnabled() &&
     process.env.STRIPE_SECRET_KEY &&
-    process.env.STRIPE_WEBHOOK_SECRET &&
-    process.env.STRIPE_PORTAL_CONFIGURATION_ID &&
-    PLANS.every((plan) =>
-      ["month", "year"].every((interval) =>
-        stripePriceId(plan.id, interval as BillingInterval),
-      ),
-    ),
+    process.env.STRIPE_WEBHOOK_SECRET,
   );
 }
 export function stripeClient() {
@@ -48,20 +32,14 @@ export function requireBilling() {
       503,
     );
 }
-export function identifyPrice(priceId: string) {
-  for (const plan of PLANS)
-    for (const interval of ["month", "year"] as const)
-      if (stripePriceId(plan.id, interval) === priceId)
-        return { plan: plan.id, interval };
-  return null;
-}
 export function validatePrice(
   price: Stripe.Price,
   plan: PlanId,
   interval: BillingInterval,
+  purchasing = true,
 ) {
   if (
-    !price.active ||
+    (purchasing && !price.active) ||
     price.currency !== "usd" ||
     price.unit_amount !== planAmount(plan, interval) ||
     price.type !== "recurring" ||

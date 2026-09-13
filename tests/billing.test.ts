@@ -9,6 +9,8 @@ const mock = vi.hoisted(() => ({
   ensure: vi.fn(),
   client: vi.fn(),
   prices: vi.fn(),
+  listPrices: vi.fn(),
+  product: vi.fn(),
   customers: vi.fn(),
   subscriptions: vi.fn(),
   listSubscriptions: vi.fn(),
@@ -41,7 +43,7 @@ vi.mock("@/lib/server/stripe", async (original) => ({
   stripeClient: mock.client,
 }));
 import { checkout, processStripeEvent } from "@/lib/server/billing";
-import { validatePrice } from "@/lib/server/stripe";
+import { validatePrice, billingConfigured } from "@/lib/server/stripe";
 import { POST as webhook } from "@/app/api/billing/webhook/route";
 import { POST as checkoutRoute } from "@/app/api/billing/checkout/route";
 const secret = "whsec_fixture_only_not_live";
@@ -84,6 +86,9 @@ const line = () => ({
 const price = () =>
   ({
     id: "price_starter_month",
+    product: "editingapp_starter_v1",
+    lookup_key: "editingapp_starter_v1_month",
+    metadata: { plan_id: "starter", credits_version: "1" },
     active: true,
     currency: "usd",
     unit_amount: 1900,
@@ -91,7 +96,7 @@ const price = () =>
     recurring: { interval: "month", interval_count: 1, usage_type: "licensed" },
     billing_scheme: "per_unit",
     transform_quantity: null,
-  }) as Stripe.Price;
+  }) as unknown as Stripe.Price;
 const event = (type: string, id = "evt_fixture", object = { id: "in_paid" }) =>
   ({ id, type, created: 12345, data: { object } }) as unknown as Stripe.Event;
 beforeEach(() => {
@@ -103,14 +108,6 @@ beforeEach(() => {
   vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "fixture");
   vi.stubEnv("STRIPE_SECRET_KEY", "sk_test_fixture_only");
   vi.stubEnv("STRIPE_WEBHOOK_SECRET", secret);
-  vi.stubEnv("STRIPE_PORTAL_CONFIGURATION_ID", "bpc_fixture");
-  for (const p of PLANS)
-    for (const interval of ["month", "year"]) {
-      vi.stubEnv(
-        `STRIPE_PRICE_${p.id.toUpperCase()}_${interval.toUpperCase()}`,
-        `price_${p.id}_${interval}`,
-      );
-    }
   mock.user.mockResolvedValue({ id: "owner", email: "owner@example.test" });
   mock.ensure.mockResolvedValue(undefined);
   mock.single.mockResolvedValue({
@@ -123,6 +120,12 @@ beforeEach(() => {
   });
   mock.rpc.mockResolvedValue({ data: true, error: null });
   mock.prices.mockResolvedValue(price());
+  mock.listPrices.mockResolvedValue({ data: [price()], has_more: false });
+  mock.product.mockResolvedValue({
+    id: "editingapp_starter_v1",
+    active: true,
+    metadata: { editingapp: "credits-v1", plan_id: "starter" },
+  });
   mock.listSubscriptions.mockResolvedValue({ data: [], has_more: false });
   mock.subscriptions.mockResolvedValue(subscription());
   mock.invoices.mockResolvedValue(invoice());
@@ -137,7 +140,8 @@ beforeEach(() => {
   });
   mock.client.mockReturnValue({
     webhooks: sdk.webhooks,
-    prices: { retrieve: mock.prices },
+    prices: { retrieve: mock.prices, list: mock.listPrices },
+    products: { retrieve: mock.product },
     customers: { create: mock.customers },
     subscriptions: {
       retrieve: mock.subscriptions,
@@ -156,6 +160,11 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 describe("Stripe billing boundaries with simulated network", () => {
+  it("enables billing with only secret and webhook keys after the credit migration flag", () => {
+    expect(billingConfigured()).toBe(true);
+    vi.stubEnv("STRIPE_WEBHOOK_SECRET", "");
+    expect(billingConfigured()).toBe(false);
+  });
   it("uses two free months annually and twelve months of credits", () => {
     expect(
       PLANS.map((p) => [

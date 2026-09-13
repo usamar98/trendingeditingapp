@@ -4,6 +4,8 @@ Native **Next.js 16.3.5 + TypeScript**, Supabase Auth/Postgres/private Storage, 
 
 The September 13 release adds an **AI Figurine Generator**, an expandable homepage tool catalog, header login/signup, private profile and credit history, and **Stripe** monthly/yearly subscriptions. Start with [billing and Supabase activation](docs/BILLING_SETUP.md) and [feature research](docs/FEATURE_RESEARCH_20260913.md). The existing production allowance remains available until `CREDITS_ENABLED=true` is configured after the migration. Real generation/payment verification needs credentials; the browser tests are simulated.
 
+Stripe setup needs only `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`; products, recurring prices and the customer portal configuration are created or reused by the server when first needed. No price-ID or portal-ID environment variables are required. Add `https://www.editingapp.live/api/billing/webhook` as the Stripe webhook destination with the events in the billing guide.
+
 ## What works
 
 - Responsive, indexable landing page and three presets: 80s Studio, Retro Cinema, Vintage Family Album.

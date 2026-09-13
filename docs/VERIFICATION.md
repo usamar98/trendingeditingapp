@@ -1,5 +1,11 @@
 # Verification record
 
+## September 13 — simplified Stripe environment
+
+Removed all seven Stripe price/portal ID environment dependencies. The server now resolves reviewed products/prices by stable Stripe IDs and lookup keys, creates missing objects with idempotency keys, and resolves the billing portal configuration automatically. Webhooks retrieve canonical prices without creating catalog objects. Existing setup-script objects and archived tagged renewal prices remain recognizable; mismatched and archived prices cannot start new sales.
+
+Verified: production build, lint and TypeScript passed; **128 unit/integration tests** passed across 12 suites, including all six monthly/yearly prices, cold-start reuse, concurrent creation keys, lost-response recovery, price validation and portal restrictions. **10 relevant desktop/mobile browser tests** passed for the catalog, credits, account, downloads and checkout failures. All Stripe/provider responses in these tests are explicitly simulated. The optional webhook setup CLI reports the missing secret key before making API requests; no live Stripe objects or payments were created in this workspace. This simplification requires no additional SQL migration beyond the credit migration already shipped.
+
 ## September 13 — catalog, figurines, credit accounts and Stripe
 
 The production build, ESLint and TypeScript checks passed on Node 22.14.0 with Next.js 16.3.5. **114 unit/integration tests** pass across 11 suites; **32 Chrome desktop/mobile browser tests** pass. The browser failures initially found were ambiguous selectors in new tests; these were corrected. Visual review also found a cropped figurine on the homepage; its frame now preserves the whole image.

@@ -3,14 +3,12 @@ import type Stripe from "stripe";
 import { admin } from "./supabase";
 import { ensureAccount } from "./account";
 import { appUrl } from "./config";
+import { stripeClient, requireBilling, stripeId } from "./stripe";
 import {
-  stripeClient,
-  stripePriceId,
-  requireBilling,
-  validatePrice,
-  stripeId,
   identifyPrice,
-} from "./stripe";
+  resolvePlanPrice,
+  resolvePortalConfiguration,
+} from "./stripe-catalog";
 import {
   planCredits,
   planAmount,
@@ -29,8 +27,6 @@ export async function checkout(
   await ensureAccount(user.id);
   const stripe = stripeClient();
   const db = admin();
-  const priceId = stripePriceId(plan, interval)!;
-  validatePrice(await stripe.prices.retrieve(priceId), plan, interval);
   const profile = await db
     .from("account_profiles")
     .select("stripe_customer_id")
@@ -126,6 +122,7 @@ export async function checkout(
       409,
     );
   }
+  const priceId = await resolvePlanPrice(stripe, plan, interval);
   const session = await stripe.checkout.sessions.create(
     {
       mode: "subscription",
@@ -179,9 +176,11 @@ export async function billingPortal(userId: string) {
       "Choose a plan before opening billing management.",
       400,
     );
-  const portal = await stripeClient().billingPortal.sessions.create({
+  const stripe = stripeClient();
+  const configuration = await resolvePortalConfiguration(stripe, appUrl());
+  const portal = await stripe.billingPortal.sessions.create({
     customer: profile.data.stripe_customer_id,
-    configuration: process.env.STRIPE_PORTAL_CONFIGURATION_ID!,
+    configuration,
     return_url: returnUrl(),
   });
   return { url: portal.url };
@@ -203,7 +202,7 @@ export async function syncSubscription(id: string, created: number) {
   const user = customer && (await customerOwner(customer));
   if (!user || subscription.metadata.editingapp_user_id !== user) return;
   const item = subscription.items.data[0];
-  const plan = item && identifyPrice(item.price.id);
+  const plan = item && (await identifyPrice(stripeClient(), item.price.id));
   if (!plan || subscription.items.data.length !== 1 || item.quantity !== 1)
     throw new Error("Unsupported subscription plan");
   const { error } = await admin().rpc("sync_billing_subscription", {
@@ -252,7 +251,7 @@ export async function processStripeEvent(event: Stripe.Event) {
       throw new Error("Unsupported invoice lines");
     const line = lines.data[0];
     const price = stripeId(line.pricing?.price_details?.price);
-    const plan = price && identifyPrice(price);
+    const plan = price && (await identifyPrice(stripe, price));
     if (
       !plan ||
       line.quantity !== 1 ||
