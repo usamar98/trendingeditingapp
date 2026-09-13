@@ -10,7 +10,7 @@ import {
   type VideoJobView,
 } from "@/lib/video";
 import { runFeature } from "./ai/features";
-import { ProviderError } from "./ai/errors";
+import { ProviderError, ProviderReadError } from "./ai/errors";
 import { readQueue, downloadFalVideo, deleteFalPayload } from "./ai/fal-queue";
 import { videoWebhookUrl } from "./ai/fal-webhook";
 import { inspectMp4 } from "./video-mp4";
@@ -228,6 +228,7 @@ export async function reconcileVideo(job: VideoJob, webhookRequestId?: string) {
   if (claimed.error) throw claimed.error;
   if (!claimed.data) return getVideoJob(job.id);
   job = claimed.data as VideoJob;
+  let stage = "VIDEO_RECOVERY_UNAVAILABLE";
   try {
     if (
       webhookRequestId &&
@@ -248,6 +249,7 @@ export async function reconcileVideo(job: VideoJob, webhookRequestId?: string) {
       return getVideoJob(job.id);
     }
     if (!job.provider_request_id) return job; // No second submission, regardless of age.
+    stage = "VIDEO_STORAGE_UNAVAILABLE";
     const storage = admin().storage.from(VIDEO_BUCKET);
     const files = await storage.list(`${job.user_id}/${job.id}`, {
       search: "video.mp4",
@@ -255,6 +257,7 @@ export async function reconcileVideo(job: VideoJob, webhookRequestId?: string) {
     });
     if (files.error) throw files.error;
     if (!files.data.some((f) => f.name === "video.mp4")) {
+      stage = "VIDEO_STATUS_UNAVAILABLE";
       const status = await readQueue(job.provider_request_id, "status");
       if (status.status === "IN_QUEUE" || status.status === "IN_PROGRESS") {
         await writeVideo(
@@ -274,19 +277,51 @@ export async function reconcileVideo(job: VideoJob, webhookRequestId?: string) {
         await cleanProvider(job, lease);
         return getVideoJob(job.id);
       }
-      const output = await readQueue(job.provider_request_id, "result");
+      stage = "VIDEO_RESULT_UNAVAILABLE";
+      await writeVideo(job.id, { error_code: "VIDEO_SAVING" }, lease);
+      let output: unknown;
+      try {
+        output = await readQueue(job.provider_request_id, "result");
+      } catch (error) {
+        if (!(error instanceof ProviderReadError) || !error.definitive)
+          throw error;
+        await failure(job.id, false, "GENERATION_FAILED");
+        await cleanProvider(job, lease);
+        return getVideoJob(job.id);
+      }
+      stage = "VIDEO_DOWNLOAD_UNAVAILABLE";
       const bytes = await downloadFalVideo(output);
+      stage = "VIDEO_OUTPUT_INVALID";
       const info = inspectMp4(bytes);
       if (info.seconds < 2.5 || info.seconds > 5.5)
         throw new Error("Unexpected output duration");
+      stage = "VIDEO_STORAGE_UNAVAILABLE";
       const saved = await storage.upload(videoPath(job, "video"), bytes, {
         contentType: "video/mp4",
         upsert: true,
       });
       if (saved.error) throw saved.error;
     }
+    stage = "VIDEO_SAVE_UNAVAILABLE";
     await writeVideo(job.id, { status: "succeeded", error_code: null }, lease);
     await cleanProvider(job, lease);
+  } catch (error) {
+    if (error instanceof AppError) throw error;
+    const code =
+      error instanceof ProviderReadError && error.reason !== "QUEUE_UNAVAILABLE"
+        ? error.reason
+        : stage;
+    // Deliberately exclude raw provider/storage errors, URLs and payloads: they
+    // can contain private photos or credentials. IDs + stage identify the fault.
+    console.error("Video recovery paused", {
+      jobId: job.id,
+      stage,
+      code,
+      ...(error instanceof ProviderReadError && error.httpStatus
+        ? { httpStatus: error.httpStatus }
+        : {}),
+    });
+    await writeVideo(job.id, { error_code: code }, lease);
   } finally {
     await writeVideo(job.id, { lease_id: null, lease_until: null }, lease);
   }

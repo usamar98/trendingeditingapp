@@ -129,6 +129,59 @@ describe("reviewed video adapters and private delivery", () => {
     expect(fetcher.mock.calls[0][1].headers.Authorization).toBe("Key test-key");
   });
   it.each([
+    {
+      detail: [
+        {
+          loc: ["body", "image"],
+          msg: "Rejected",
+          type: "content_policy_violation",
+        },
+      ],
+    },
+    { detail: "No media generated" },
+  ])(
+    "identifies a final result's documented or legacy 422 failure",
+    async (body) => {
+      fetcher.mockResolvedValue(Response.json(body, { status: 422 }));
+      await expect(readQueue(requestId, "result")).rejects.toMatchObject({
+        definitive: true,
+        reason: "GENERATION_FAILED",
+        httpStatus: 422,
+      });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    },
+  );
+  it.each([401, 403, 404, 408, 429, 500, 502, 503, 504])(
+    "does not refund on an HTTP %s result lookup error",
+    async (status) => {
+      fetcher.mockResolvedValue(
+        Response.json({ detail: "Unavailable" }, { status }),
+      );
+      await expect(readQueue(requestId, "result")).rejects.toMatchObject({
+        definitive: false,
+      });
+    },
+  );
+  it("does not treat a status error or malformed 422 body as a failed generation", async () => {
+    fetcher
+      .mockResolvedValueOnce(
+        Response.json({ detail: "Unavailable" }, { status: 422 }),
+      )
+      .mockResolvedValueOnce(
+        new Response("<html>gateway error</html>", { status: 422 }),
+      )
+      .mockResolvedValueOnce(Response.json({ detail: [] }, { status: 422 }));
+    await expect(readQueue(requestId, "status")).rejects.toMatchObject({
+      definitive: false,
+    });
+    await expect(readQueue(requestId, "result")).rejects.toMatchObject({
+      definitive: false,
+    });
+    await expect(readQueue(requestId, "result")).rejects.toMatchObject({
+      definitive: false,
+    });
+  });
+  it.each([
     "https://evil.test/video.mp4",
     "http://v3b.fal.media/files/b/a/x.mp4",
     "https://v3b.fal.media.evil.test/files/b/a/x.mp4",
@@ -155,6 +208,22 @@ describe("reviewed video adapters and private delivery", () => {
         redirect: "error",
       }),
     ]);
+  });
+  it("identifies CDN authentication failures without forwarding secrets or fetching the file", async () => {
+    fetcher.mockResolvedValue(
+      Response.json(
+        { detail: "private provider information" },
+        { status: 403 },
+      ),
+    );
+    await expect(
+      downloadFalVideo({ video: { url: cdn } }),
+    ).rejects.toMatchObject({
+      reason: "VIDEO_CDN_AUTH_UNAVAILABLE",
+      httpStatus: 403,
+      definitive: false,
+    });
+    expect(fetcher).toHaveBeenCalledTimes(1);
   });
   it("bounds chunked provider media and deletes payload only on confirmed cleanup", async () => {
     await expect(boundedBytes(new Response("123456"), 5)).rejects.toThrow();

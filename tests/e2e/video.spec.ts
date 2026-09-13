@@ -212,6 +212,86 @@ test("simulated lost submission response recovers with GET only", async ({
   ).toBeVisible();
   expect(posts).toBe(1);
 });
+
+test("simulated saved request recovers after a delivery failure without another charge", async ({
+  page,
+}) => {
+  await setup(page);
+  let posts = 0;
+  let checks = 0;
+  let historyReads = 0;
+  let releaseSession!: () => void;
+  const sessionReady = new Promise<void>((resolve) => {
+    releaseSession = resolve;
+  });
+  await page.route("**/api/session", async (r) => {
+    await sessionReady;
+    return r.fulfill({
+      json: {
+        configured: true,
+        authConfigured: true,
+        creditMode: "credits",
+        credits: 600,
+        user: { email: "video-fixture@example.test", displayName: "Alex" },
+      },
+    });
+  });
+  let recovered = false;
+  const pending = {
+    ...result,
+    preset: "memory",
+    status: "queued",
+    errorCode: "VIDEO_CDN_AUTH_UNAVAILABLE",
+  };
+  await page.route("**/api/videos", (r) => {
+    if (r.request().method() === "POST") posts++;
+    else historyReads++;
+    return r.fulfill({
+      json: { available: true, jobs: [recovered ? result : pending] },
+    });
+  });
+  await page.route(`**/api/videos/${id}`, (r) => {
+    checks++;
+    return r.fulfill({ json: recovered ? result : pending });
+  });
+  await page.route(`**/api/videos/${id}/media*`, (r) =>
+    r.fulfill({ contentType: "video/mp4", body: clip }),
+  );
+  await page.goto("/tools/ai-photo-to-video");
+  expect(historyReads).toBe(0);
+  releaseSession();
+  await expect(
+    page.getByRole("heading", {
+      name: "Your video needs another status check.",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/Your credits remain reserved while we recover/),
+  ).toBeVisible();
+  await page.getByText("Request details", { exact: true }).click();
+  await expect(
+    page.locator("details").filter({ hasText: "Request ID:" }),
+  ).toContainText(id);
+  await expect(
+    page.locator("details").filter({ hasText: "Request ID:" }),
+  ).toContainText("VIDEO_CDN_AUTH_UNAVAILABLE");
+  await page.getByRole("button", { name: "Check video status" }).click();
+  await expect(
+    page.getByRole("button", { name: "Check video status" }),
+  ).toBeEnabled();
+  await accessible(page);
+  await page.reload();
+  await expect(
+    page.getByRole("heading", {
+      name: "Your video needs another status check.",
+    }),
+  ).toBeVisible();
+  recovered = true;
+  await page.getByRole("button", { name: "Check video status" }).click();
+  await expect(page.getByRole("link", { name: "Download MP4" })).toBeVisible();
+  expect(posts).toBe(0);
+  expect(checks).toBeGreaterThanOrEqual(2);
+});
 test("simulated motion-reference submission shows 90 credits before dispatch", async ({
   page,
 }) => {

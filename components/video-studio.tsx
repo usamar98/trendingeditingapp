@@ -25,6 +25,7 @@ import {
   VIDEO_REFERENCE_MAX_BYTES,
   videoCredits,
   videoPreset,
+  videoRecoveryMessage,
   type VideoPreset,
   type VideoJobView,
 } from "@/lib/video";
@@ -73,10 +74,12 @@ function VideoWorkspace() {
     blobUrl = useRef(""),
     owner = useRef<string | undefined>(undefined);
   const email = session?.user?.email;
+  const accountReady = session !== null;
   const previewPanel = useRef<HTMLDivElement>(null);
   const cost = videoCredits(preset);
   const style = videoPreset(preset)!;
   const locked = !session || busy || active(job);
+  const recovery = active(job) ? videoRecoveryMessage(job!.errorCode) : null;
   const mediaVersion = useRef(0);
   const [mediaKey, setMediaKey] = useState(0);
   const remember = useCallback(
@@ -127,6 +130,9 @@ function VideoWorkspace() {
     [load],
   );
   useEffect(() => {
+    // Resolve the account first: a cookie-authenticated history response can
+    // otherwise arrive before the session and be discarded during initialization.
+    if (!accountReady) return;
     let live = true;
     const version = ++viewVersion.current;
     if (owner.current !== email) {
@@ -164,6 +170,7 @@ function VideoWorkspace() {
         if (last) {
           setJob(last);
           setPreset(last.preset);
+          remember(last.id);
         } else if (saved && /^[0-9a-f-]{36}$/i.test(saved)) void check(saved);
       })
       .catch(() => {
@@ -175,7 +182,7 @@ function VideoWorkspace() {
     return () => {
       live = false;
     };
-  }, [email, load, check]);
+  }, [accountReady, email, load, check, remember]);
   useEffect(
     () => () => {
       if (blobUrl.current) URL.revokeObjectURL(blobUrl.current);
@@ -686,14 +693,17 @@ function VideoWorkspace() {
             <>
               <div className="video-screen video-waiting">
                 <div className="video-wait-icon">
-                  {active(job) ? (
+                  {active(job) &&
+                  (!recovery ||
+                    checking ||
+                    job.errorCode === "VIDEO_SAVING") ? (
                     <LoaderCircle size={32} className="spin" />
                   ) : (
                     <Film size={32} />
                   )}
                 </div>
                 <h3>
-                  {
+                  {recovery?.title ||
                     (
                       {
                         reserved: "Your scene is getting ready.",
@@ -704,17 +714,17 @@ function VideoWorkspace() {
                         failed: "This take couldn’t be completed.",
                         expired: "These files are no longer available.",
                       } as Record<string, string>
-                    )[job.status]
-                  }
+                    )[job.status]}
                 </h3>
                 <p>
-                  {job.status === "failed"
-                    ? "The generation failed. Your reserved credits have been restored with their original expiry."
-                    : job.status === "expired"
-                      ? "The access window ended or you deleted the files. Saved downloads remain on your device."
-                      : job.status === "uncertain"
-                        ? "The outcome is not confirmed. Your credits stay reserved. Check this same request; we never automatically generate again."
-                        : "This can take several minutes. You can leave this page and find the request in Your recent videos when you return."}
+                  {recovery?.detail ||
+                    (job.status === "failed"
+                      ? "The generation failed. Your reserved credits have been restored with their original expiry."
+                      : job.status === "expired"
+                        ? "The access window ended or you deleted the files. Saved downloads remain on your device."
+                        : job.status === "uncertain"
+                          ? "The outcome is not confirmed. Your credits stay reserved. Check this same request; we never automatically generate again."
+                          : "This can take several minutes. You can leave this page and find the request in Your recent videos when you return.")}
                 </p>
                 {active(job) && (
                   <button
@@ -731,6 +741,22 @@ function VideoWorkspace() {
                 Request {job.id.slice(0, 8)} · {job.creditsCharged} credits{" "}
                 {job.status === "failed" ? "restored" : "reserved"}
               </p>
+              <details className="video-footnote">
+                <summary>Request details</summary>
+                <p style={{ overflowWrap: "anywhere" }}>
+                  Request ID: <code>{job.id}</code>
+                  <br />
+                  Movement: {videoPreset(job.preset)?.name}
+                  <br />
+                  Status: {job.status}
+                  {job.errorCode && (
+                    <>
+                      <br />
+                      Support code: <code>{job.errorCode}</code>
+                    </>
+                  )}
+                </p>
+              </details>
               {!active(job) && (
                 <button className="secondary" onClick={startAnother}>
                   Start a new video

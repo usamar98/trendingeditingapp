@@ -1,5 +1,5 @@
 import "server-only";
-import { ProviderError } from "./errors";
+import { ProviderError, ProviderReadError } from "./errors";
 
 export const QUEUE_ROOT = "https://queue.fal.run/fal-ai/kling-video";
 export async function boundedBytes(response: Response, limit: number) {
@@ -102,15 +102,47 @@ export async function readQueue(requestId: string, kind: "status" | "result") {
     signal: AbortSignal.timeout(20_000),
   });
   if (!response.ok) {
-    await response.body?.cancel();
-    throw new Error("Queue temporarily unavailable");
+    // Some fal models expose failures only through HTTP 422 on the completed
+    // result, without an error field on the status response. Never interpret a
+    // gateway page, missing result, auth error, or failed status GET as terminal.
+    let definitive = false;
+    if (kind === "result" && response.status === 422) {
+      try {
+        const { detail } = await providerJson(response);
+        definitive =
+          (typeof detail === "string" && detail.trim().length > 0) ||
+          (Array.isArray(detail) &&
+            detail.length > 0 &&
+            detail.every(
+              (item) =>
+                item &&
+                Array.isArray(item.loc) &&
+                typeof item.msg === "string" &&
+                typeof item.type === "string" &&
+                item.type.length > 0,
+            ));
+      } catch {
+        // Invalid/oversize responses cannot establish the generation outcome.
+      }
+    } else await response.body?.cancel();
+    throw new ProviderReadError(
+      definitive ? "GENERATION_FAILED" : "QUEUE_UNAVAILABLE",
+      response.status,
+      definitive,
+    );
   }
   return providerJson(response);
 }
 export function videoOutputUrl(data: unknown): string {
   const value = (data as { video?: { url?: unknown } })?.video?.url;
-  if (typeof value !== "string") throw new Error("Missing video");
-  const url = new URL(value);
+  if (typeof value !== "string")
+    throw new ProviderReadError("VIDEO_OUTPUT_MISSING");
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new ProviderReadError("VIDEO_OUTPUT_URL_UNSUPPORTED");
+  }
   // No arbitrary host, redirects or credentials; never send a CDN token to a third party.
   if (
     url.protocol !== "https:" ||
@@ -122,7 +154,7 @@ export function videoOutputUrl(data: unknown): string {
     url.hash ||
     !/^\/files\/b\/[a-zA-Z0-9_-]+\/[a-zA-Z0-9_.-]+$/.test(url.pathname)
   )
-    throw new Error("Unreviewed video URL");
+    throw new ProviderReadError("VIDEO_OUTPUT_URL_UNSUPPORTED");
   return url.href;
 }
 export async function downloadFalVideo(data: unknown) {
@@ -140,11 +172,16 @@ export async function downloadFalVideo(data: unknown) {
   );
   if (!response.ok) {
     await response.body?.cancel();
-    throw new Error("CDN authentication unavailable");
+    throw new ProviderReadError("VIDEO_CDN_AUTH_UNAVAILABLE", response.status);
   }
   const { token } = await providerJson(response);
-  if (typeof token !== "string" || token.length > 16000 || /[\r\n]/.test(token))
-    throw new Error("Invalid CDN token");
+  if (
+    typeof token !== "string" ||
+    !token ||
+    token.length > 16000 ||
+    /[\r\n]/.test(token)
+  )
+    throw new ProviderReadError("VIDEO_CDN_AUTH_UNAVAILABLE");
   const file = await fetch(url, {
     headers: { Authorization: `Bearer ${token}` },
     cache: "no-store",
@@ -153,7 +190,7 @@ export async function downloadFalVideo(data: unknown) {
   });
   if (!file.ok) {
     await file.body?.cancel();
-    throw new Error("Video unavailable");
+    throw new ProviderReadError("VIDEO_DOWNLOAD_UNAVAILABLE", file.status);
   }
   return boundedBytes(file, 50_000_000);
 }

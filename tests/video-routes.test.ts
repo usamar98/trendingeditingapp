@@ -42,6 +42,7 @@ vi.mock("@/lib/server/ai/fal-webhook", () => ({
 }));
 import { POST } from "@/app/api/videos/route";
 import { GET as media } from "@/app/api/videos/[id]/media/route";
+import { GET as status } from "@/app/api/videos/[id]/route";
 import { POST as callback } from "@/app/api/videos/webhook/route";
 const id = "b827395f-a85b-48a4-83dd-106a7348a7f6";
 const job = {
@@ -225,4 +226,20 @@ it("requires both callback signatures and retries delivery until output is saved
   expect((await call()).status).toBe(503);
   expect((await call()).status).toBe(200);
   expect(f.reconcile).toHaveBeenLastCalledWith(job, "fal-request-12345");
+});
+it("returns actionable status-check errors while preserving authorization responses", async () => {
+  const read = () =>
+    status(new Request(`http://localhost:3001/api/videos/${id}`), {
+      params: Promise.resolve({ id }),
+    });
+  f.reconcile.mockRejectedValue(new Error("private database diagnostics"));
+  const response = await read();
+  expect(response.status).toBe(503);
+  expect(await response.json()).toEqual({
+    code: "VIDEO_CHECK_UNAVAILABLE",
+    error:
+      "We couldn’t check your video right now. Use Check video status on this same request; checking will not charge you again.",
+  });
+  f.user.mockRejectedValue(new AppError("AUTH", "Sign in", 401));
+  expect((await read()).status).toBe(401);
 });

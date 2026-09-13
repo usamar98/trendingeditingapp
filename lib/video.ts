@@ -71,3 +71,18 @@ export type VideoJobView = {
   expiresAt: string;
   errorCode: string | null;
 };
+
+export function videoRecoveryMessage(code: string | null) {
+  if (!code?.startsWith("VIDEO_")) return null;
+  if (code === "VIDEO_SAVING")
+    return {
+      title: "Retrieving your video.",
+      detail:
+        "The generation request has finished processing. We’re retrieving and saving its result to your private library. No extra credits are charged.",
+    };
+  return {
+    title: "Your video needs another status check.",
+    detail:
+      "We couldn’t finish checking or saving this request. Your credits remain reserved while we recover its outcome. Check this same request again; this does not generate another video or charge more credits. If it persists, share the request details below with support.",
+  };
+}

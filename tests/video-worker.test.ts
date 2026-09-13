@@ -23,7 +23,7 @@ import {
   deleteVideo,
   type VideoJob,
 } from "@/lib/server/video-jobs";
-import { ProviderError } from "@/lib/server/ai/errors";
+import { ProviderError, ProviderReadError } from "@/lib/server/ai/errors";
 let job: VideoJob & { lease_id?: string | null };
 const rpc = vi.fn(),
   upload = vi.fn(),
@@ -141,9 +141,10 @@ describe("video reconciliation with simulated provider/storage boundaries", () =
   });
   it("preserves the outcome and releases the lease on temporary status errors", async () => {
     fake.read.mockRejectedValue(new Error("queue unavailable"));
-    await expect(reconcileVideo({ ...job })).rejects.toThrow(
-      "queue unavailable",
-    );
+    expect(await reconcileVideo({ ...job })).toMatchObject({
+      status: "queued",
+      error_code: "VIDEO_STATUS_UNAVAILABLE",
+    });
     expect(job.status).toBe("queued");
     expect(job.lease_id).toBeNull();
     expect(
@@ -169,11 +170,91 @@ describe("video reconciliation with simulated provider/storage boundaries", () =
       .mockResolvedValueOnce({ video: { url: "private" } });
     fake.download.mockResolvedValue(syntheticVideo());
     upload.mockResolvedValue({ error: new Error("storage down") });
-    await expect(reconcileVideo({ ...job })).rejects.toThrow("storage down");
+    expect(await reconcileVideo({ ...job })).toMatchObject({
+      status: "queued",
+      error_code: "VIDEO_STORAGE_UNAVAILABLE",
+    });
     expect(fake.clean).not.toHaveBeenCalled();
     expect(job.status).toBe("queued");
     expect(job.lease_id).toBeNull();
+    fake.read
+      .mockResolvedValueOnce({ status: "COMPLETED" })
+      .mockResolvedValueOnce({ video: { url: "private" } });
+    upload.mockResolvedValue({ error: null });
+    expect(await reconcileVideo({ ...job })).toMatchObject({
+      status: "succeeded",
+      error_code: null,
+    });
+    expect(fake.run).not.toHaveBeenCalled();
+    expect(
+      rpc.mock.calls.some(([name]) => name === "settle_video_failure"),
+    ).toBe(false);
   });
+  it("refunds a completed request whose failure is only on the result endpoint", async () => {
+    fake.read
+      .mockResolvedValueOnce({ status: "COMPLETED" })
+      .mockRejectedValueOnce(
+        new ProviderReadError("GENERATION_FAILED", 422, true),
+      );
+    expect(await reconcileVideo({ ...job })).toMatchObject({
+      status: "failed",
+      error_code: "GENERATION_FAILED",
+    });
+    expect(rpc).toHaveBeenCalledWith("settle_video_failure", {
+      p_id: id,
+      p_uncertain: false,
+      p_error: "GENERATION_FAILED",
+    });
+    expect(fake.download).not.toHaveBeenCalled();
+    expect(fake.run).not.toHaveBeenCalled();
+  });
+  it("preserves a completed request on an ambiguous result failure and exposes no private error data", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      fake.read
+        .mockResolvedValueOnce({ status: "COMPLETED" })
+        .mockRejectedValueOnce(
+          new Error("private URL and key must not be logged"),
+        );
+      expect(await reconcileVideo({ ...job })).toMatchObject({
+        status: "queued",
+        error_code: "VIDEO_RESULT_UNAVAILABLE",
+      });
+      expect(log).toHaveBeenCalledWith("Video recovery paused", {
+        jobId: id,
+        stage: "VIDEO_RESULT_UNAVAILABLE",
+        code: "VIDEO_RESULT_UNAVAILABLE",
+      });
+      expect(fake.clean).not.toHaveBeenCalled();
+      expect(fake.run).not.toHaveBeenCalled();
+      expect(
+        rpc.mock.calls.some(([name]) => name === "settle_video_failure"),
+      ).toBe(false);
+    } finally {
+      log.mockRestore();
+    }
+  });
+  it.each([
+    new ProviderReadError("VIDEO_CDN_AUTH_UNAVAILABLE", 403),
+    new ProviderReadError("VIDEO_OUTPUT_URL_UNSUPPORTED"),
+  ])(
+    "retains provider output and credits when private delivery is blocked: $reason",
+    async (error) => {
+      fake.read
+        .mockResolvedValueOnce({ status: "COMPLETED" })
+        .mockResolvedValueOnce({ video: { url: "private" } });
+      fake.download.mockRejectedValue(error);
+      expect(await reconcileVideo({ ...job })).toMatchObject({
+        error_code: error.reason,
+      });
+      expect(fake.clean).not.toHaveBeenCalled();
+      expect(upload).not.toHaveBeenCalled();
+      expect(fake.run).not.toHaveBeenCalled();
+      expect(
+        rpc.mock.calls.some(([name]) => name === "settle_video_failure"),
+      ).toBe(false);
+    },
+  );
   it("retains a durable result if provider cleanup needs a broader key scope", async () => {
     job.status = "succeeded";
     fake.clean.mockResolvedValue(false);
