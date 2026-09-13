@@ -1,5 +1,6 @@
 import "server-only";
 import { portraitPrompt, type Preset, type Quality } from "@/lib/presets";
+import { figurinePrompt, type FigurinePreset } from "@/lib/tools";
 
 export type PortraitInput = { photo: Buffer; preset: Preset; quality: Quality };
 export type PortraitOutput = {
@@ -7,8 +8,14 @@ export type PortraitOutput = {
   requestId: string | null;
   usage: null;
 };
-export type FeatureInputs = { "retro-portrait": PortraitInput };
-export type FeatureOutputs = { "retro-portrait": PortraitOutput };
+export type FeatureInputs = {
+  "retro-portrait": PortraitInput;
+  "ai-figurine": { photo: Buffer; preset: FigurinePreset; quality: Quality };
+};
+export type FeatureOutputs = {
+  "retro-portrait": PortraitOutput;
+  "ai-figurine": PortraitOutput;
+};
 export type FeatureId = keyof FeatureInputs;
 
 type FalFeature<K extends FeatureId> = {
@@ -48,6 +55,22 @@ function decodePortrait(
 
 /** Add reviewed model adapters here. Catalog discovery never modifies this allowlist. */
 export const FEATURES: { [K in FeatureId]: FalFeature<K> } = {
+  "ai-figurine": {
+    provider: "fal",
+    endpoint: "openai/gpt-image-2.5/sunburst/edit",
+    version: "1",
+    docs: "https://fal.ai/models/openai/gpt-image-2.5/sunburst/edit/api",
+    buildInput: ({ photo, preset, quality }) => ({
+      prompt: figurinePrompt(preset),
+      image_urls: [`data:image/jpeg;base64,${photo.toString("base64")}`],
+      image_size: { width: 1024, height: 1536 },
+      quality,
+      num_images: 1,
+      output_format: "png",
+      sync_mode: true,
+    }),
+    decode: decodePortrait,
+  },
   "retro-portrait": {
     provider: "fal",
     endpoint: "openai/gpt-image-2.5/sunburst/edit",

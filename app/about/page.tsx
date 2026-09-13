@@ -3,8 +3,8 @@ import { Header, Footer } from "@/components/chrome";
 import { breadcrumbs, jsonLd, pageMetadata } from "@/lib/seo";
 
 export const metadata = pageMetadata(
-  "About EditingApp & Our AI Retro Portraits",
-  "Learn what EditingApp’s retro portrait generator does, how its style demonstrations are made, and how you review, download and manage your photos.",
+  "About EditingApp & Our AI Photo Tools",
+  "Learn about EditingApp’s retro portrait and figurine tools, fictional style demonstrations, credit plans, and private photo review and downloads.",
   "/about",
 );
 
@@ -32,11 +32,11 @@ export default function AboutPage() {
         <p className="eyebrow">A NEW PORTRAIT. AN OLD-SCHOOL FEELING.</p>
         <h1>About EditingApp</h1>
         <p>
-          EditingApp turns a reference selfie into an AI portrait with styling
-          inspired by the 1980s. The current app is built around one short
+          EditingApp turns a reference photo into an imaginative retro portrait
+          or collectible figurine image. Each tool is built around one short
           workflow: choose a look, upload a photo, generate, compare and
           download. You do not need to learn image-model controls or write a
-          long prompt to try the three presets.
+          long prompt to try the available styles.
         </p>
         <h2>Three looks, one recognizable person</h2>
         <p>
@@ -54,8 +54,14 @@ export default function AboutPage() {
         </p>
         <h2>What the examples show</h2>
         <p>
+          The AI Figurine Generator imagines you as a miniature desk collectible
+          or a boxed edition. It creates a still image with sculpted materials
+          and presentation styling. It does not make a physical toy or a
+          3D-printable file.
+        </p>
+        <p>
           The example portraits on this site are AI-created demonstrations
-          featuring a fictional model. They illustrate clothing, lighting and
+          featuring fictional people. They illustrate clothing, lighting and
           color choices; they are not real customers, testimonials or evidence
           from a tested user generation. Your output will depend on the
           reference photo and the image model’s interpretation.
@@ -72,9 +78,10 @@ export default function AboutPage() {
           Choosing a file first creates a local browser preview. Generating
           sends it for processing through fal to an OpenAI image model and uses
           private Supabase storage. You verify your email to generate and
-          retrieve your photos. The initial release offers three daily attempts
-          per verified email, subject to a shared site limit, and shows the
-          remaining allowance before submission.
+          retrieve your photos. A standard image uses 3 credits and high detail
+          uses 8 under credit plans. The studio shows your current credits or
+          allowance before submission.{" "}
+          <Link href="/pricing">Compare monthly and yearly plans</Link>.
         </p>
         <p>
           You can save a portrait PNG or a labeled before-and-after image.
@@ -93,8 +100,8 @@ export default function AboutPage() {
           as AI-created. The <Link href="/terms">terms of use</Link> explain
           allowances and responsible use.
         </p>
-        <Link href="/#studio" className="primary">
-          Explore the portrait studio
+        <Link href="/#tools" className="primary">
+          Explore the photo tools
         </Link>
       </main>
       <Footer />

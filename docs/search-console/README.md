@@ -10,7 +10,7 @@ Open [Google Search Console](https://search.google.com/search-console) and selec
 
 1. Open **Sitemaps** under Indexing.
 2. Submit **https://www.editingapp.live/sitemap.xml**. If the field already displays `https://www.editingapp.live/`, enter only `sitemap.xml`.
-3. If that same sitemap is already submitted, Google can read its updated contents at the same URL. Open its report to check its fetch status; resubmit it if needed. It now lists seven current public pages.
+3. If that same sitemap is already submitted, Google can read its updated contents at the same URL. Open its report to check its fetch status; resubmit it if needed. It now lists ten current public pages, including the tool studios and pricing.
 4. Open **URL Inspection** for **https://www.editingapp.live/**. Select **Test live URL**, inspect the current content, then **Request indexing** if available. Repeat for the two new guides in `urls-to-inspect.txt`. You do not need to request every legal page manually.
 5. After Google recrawls, compare the Google-selected canonical with the declared www URL. The indexed report can show the old version until the next crawl.
 

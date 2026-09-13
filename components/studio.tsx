@@ -17,28 +17,18 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { MAX_FILE_BYTES, type Quality } from "@/lib/presets";
 import {
-  PRESETS,
-  MAX_FILE_BYTES,
-  type Preset,
-  type Quality,
-} from "@/lib/presets";
+  toolForFeature,
+  type ImageFeature,
+  type ImagePreset,
+} from "@/lib/tools";
+import { IMAGE_CREDITS } from "@/lib/plans";
+import type { AccountSession } from "@/components/account-provider";
+import { SESSION_EVENT, notifySessionChanged } from "@/lib/session-client";
 import { downloadComparison, downloadFile } from "@/lib/download";
 import { AUTH_MESSAGES, readAuthReturn } from "@/lib/auth-return";
-const SESSION_EVENT = "editingapp-session-updated";
-function notifySessionChanged() {
-  try {
-    // Only a change notification; credentials and email stay out of localStorage.
-    localStorage.setItem(SESSION_EVENT, crypto.randomUUID());
-  } catch {
-    // Focus and pre-generation checks also refresh the session.
-  }
-}
-type Session = {
-  configured: boolean;
-  user: { email: string } | null;
-  remaining: number;
-};
+type Session = AccountSession;
 type Result = {
   id: string;
   status:
@@ -48,7 +38,7 @@ type Result = {
     | "failed"
     | "uncertain"
     | "expired";
-  preset: Preset;
+  preset: ImagePreset;
   expiresAt?: string;
   errorCode?: string;
 };
@@ -61,8 +51,18 @@ async function readJson(response: Response) {
     throw new Error(body.error || "The request could not be completed.");
   return body;
 }
-export default function Studio() {
-  const [preset, setPreset] = useState<Preset>("studio");
+export default function Studio({
+  featureId = "retro-portrait",
+}: {
+  featureId?: ImageFeature;
+}) {
+  const tool = toolForFeature(featureId);
+  const presets = tool.presets;
+  const figurine = featureId === "ai-figurine";
+  const requestKey = figurine
+    ? "editingapp-figurine-request"
+    : "editingapp-request";
+  const [preset, setPreset] = useState<ImagePreset>(presets[0].id);
   const [quality, setQuality] = useState<Quality>("medium");
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState("");
@@ -92,8 +92,10 @@ export default function Studio() {
   const sendReadyAt = useRef(0);
   const validationId = useRef(0);
   const sessionVersion = useRef(0);
-  const activeStyle = PRESETS.find((p) => p.id === preset)!;
-  const jobStyle = PRESETS.find((p) => p.id === result?.preset) || activeStyle;
+  const activeStyle = presets.find((p) => p.id === preset)!;
+  const jobStyle = presets.find((p) => p.id === result?.preset) || activeStyle;
+  const creditMode = session?.creditMode === "credits";
+  const creditCost = IMAGE_CREDITS[quality];
   const refreshSession = useCallback(async () => {
     const version = ++sessionVersion.current;
     const data = (await readJson(
@@ -111,12 +113,15 @@ export default function Studio() {
       }
     }
     return data;
-  }, []);
-  const acceptResult = useCallback((data: Result) => {
-    setResult(data);
-    setPendingId(data.id);
-    localStorage.setItem("editingapp-request", data.id);
-  }, []);
+  }, [setAuthOpen, setToken, setSent]);
+  const acceptResult = useCallback(
+    (data: Result) => {
+      setResult(data);
+      setPendingId(data.id);
+      localStorage.setItem(requestKey, data.id);
+    },
+    [requestKey],
+  );
   const checkStatus = useCallback(
     async (id: string) => {
       const data = await readJson(
@@ -150,7 +155,7 @@ export default function Studio() {
           );
         }
       }
-      const saved = localStorage.getItem("editingapp-request");
+      const saved = localStorage.getItem(requestKey);
       if (saved && /^[0-9a-f-]{36}$/i.test(saved) && data.user) {
         setPendingId(saved);
         checkStatus(saved).catch(() =>
@@ -165,7 +170,7 @@ export default function Studio() {
         "Could not check your allowance. Refresh the page to reconnect.",
       ),
     );
-  }, [refreshSession, checkStatus]);
+  }, [refreshSession, checkStatus, requestKey]);
   useEffect(() => {
     const sync = () => {
       if (document.visibilityState === "visible")
@@ -175,10 +180,12 @@ export default function Studio() {
       if (event.key === SESSION_EVENT) refreshSession().catch(() => {});
     };
     window.addEventListener("focus", sync);
+    window.addEventListener(SESSION_EVENT, sync);
     document.addEventListener("visibilitychange", sync);
     window.addEventListener("storage", onStorage);
     return () => {
       window.removeEventListener("focus", sync);
+      window.removeEventListener(SESSION_EVENT, sync);
       document.removeEventListener("visibilitychange", sync);
       window.removeEventListener("storage", onStorage);
     };
@@ -344,6 +351,21 @@ export default function Studio() {
         setAuthOpen(true);
         return;
       }
+      if (current.billingHold)
+        throw new Error(
+          "Your billing account needs a review before you can generate. Open your account for details.",
+        );
+      if (figurine && current.creditMode !== "credits")
+        throw new Error(
+          "The figurine generator is coming soon. Try retro portraits while it is being connected.",
+        );
+      if (
+        current.creditMode === "credits" &&
+        (current.credits ?? 0) < creditCost
+      )
+        throw new Error(
+          `This image needs ${creditCost} credits. Choose a plan to add credits.`,
+        );
     } catch (cause) {
       setError((cause as Error).message);
       return;
@@ -361,11 +383,12 @@ export default function Studio() {
     setBusy(true);
     const id = pendingId || crypto.randomUUID();
     setPendingId(id);
-    localStorage.setItem("editingapp-request", id);
+    localStorage.setItem(requestKey, id);
     const form = new FormData();
     form.set("photo", file);
     form.set("preset", preset);
     form.set("quality", quality);
+    form.set("featureId", featureId);
     form.set("requestId", id);
     form.set("consent", "true");
     try {
@@ -378,7 +401,7 @@ export default function Studio() {
         const data = await response.json();
         if (!retry) {
           setPendingId(null);
-          localStorage.removeItem("editingapp-request");
+          localStorage.removeItem(requestKey);
         }
         throw new Error(data.error || "Generation could not start.");
       }
@@ -389,6 +412,7 @@ export default function Studio() {
       submitLock.current = false;
       setBusy(false);
       refreshSession().catch(() => {});
+      notifySessionChanged();
     }
   }
   async function reconnect() {
@@ -405,7 +429,7 @@ export default function Studio() {
     setResult(null);
     setPendingId(null);
     setError("");
-    localStorage.removeItem("editingapp-request");
+    localStorage.removeItem(requestKey);
   }
   async function removePhotos() {
     if (!pendingId) return;
@@ -431,7 +455,9 @@ export default function Studio() {
       if (kind === "portrait")
         await downloadFile(
           `${base}?download=1`,
-          "editingapp-retro-portrait.png",
+          figurine
+            ? "editingapp-figurine.png"
+            : "editingapp-retro-portrait.png",
         );
       else
         await downloadComparison(`${base}?kind=original`, base, jobStyle.name);
@@ -445,30 +471,43 @@ export default function Studio() {
     ? `/api/portraits/${result.id}/image?kind=original`
     : preview;
   return (
-    <section className="studio" id="studio" aria-labelledby="studio-title">
+    <section
+      className={`studio ${figurine ? "figurine-studio" : ""}`}
+      id="studio"
+      aria-labelledby="studio-title"
+    >
       <div className="studio-toolbar">
         <div className="section-kicker">
-          <span className="tiny-star">✳</span> YOUR RETRO PHOTO STUDIO
+          <span className="tiny-star">✳</span>{" "}
+          {figurine ? "YOUR FIGURINE STUDIO" : "YOUR RETRO PHOTO STUDIO"}
         </div>
         <span className="allowance">
           <Sparkles size={15} />
-          {session?.user
-            ? `${session.remaining} of 3 portraits left today`
-            : "3 portraits daily · no payment required"}
+          {creditMode
+            ? session?.user
+              ? `${session.credits ?? 0} credits available`
+              : "9 welcome credits · no card required"
+            : session?.user
+              ? `${session.remaining} of 3 portraits left today`
+              : "3 portraits daily · no payment required"}
         </span>
       </div>
       <div className="studio-grid">
         <div className="controls">
           <div className="step-heading">
             <span>01</span>
-            <h2 id="studio-title">Choose your era energy.</h2>
+            <h2 id="studio-title">
+              {figurine
+                ? "Choose your miniature moment."
+                : "Choose your era energy."}
+            </h2>
           </div>
           <fieldset
             className="preset-list"
             disabled={Boolean(processing || pendingId)}
           >
             <legend className="sr-only">Portrait style</legend>
-            {PRESETS.map((p) => (
+            {presets.map((p) => (
               <label
                 key={p.id}
                 className={`preset ${preset === p.id ? "selected" : ""}`}
@@ -576,16 +615,19 @@ export default function Studio() {
               <option value="high">High detail</option>
             </select>
             <p>
-              Both use one portrait allowance. High detail may take longer.
-              Output: 1024 × 1536 PNG.
+              {creditMode
+                ? "Standard detail uses 3 credits; high detail uses 8 credits."
+                : "Both use one portrait allowance."}{" "}
+              High detail may take longer. Output: 1024 × 1536 PNG.
             </p>
           </details>
-          {session && !session.configured && (
+          {session && (!session.configured || (figurine && !creditMode)) && (
             <p className="setup-note">
               <LockKeyhole size={15} />
               <span>
-                Generation is awaiting setup. Explore the styles and preview
-                your selfie here.
+                {figurine && !creditMode
+                  ? "Figurine generation is coming soon. Explore the styles and preview your selfie here."
+                  : "Generation is awaiting setup. Explore the styles and preview your selfie here."}
               </span>
             </p>
           )}
@@ -597,7 +639,12 @@ export default function Studio() {
               !file ||
               !consent ||
               pendingId ||
-              (session?.user && session.remaining === 0),
+              session?.billingHold ||
+              (figurine && session && !creditMode) ||
+              (session?.user &&
+                (creditMode
+                  ? (session.credits ?? 0) < creditCost
+                  : session.remaining === 0)),
             )}
             onClick={() => generate()}
           >
@@ -614,9 +661,11 @@ export default function Studio() {
             ) : (
               <>
                 <Sparkles size={18} />
-                {session?.user
-                  ? "Generate my retro portrait"
-                  : "Create my retro portrait"}
+                {figurine
+                  ? "Generate my figurine"
+                  : session?.user
+                    ? "Generate my retro portrait"
+                    : "Create my retro portrait"}
                 <ArrowRight size={18} />
               </>
             )}
@@ -627,11 +676,29 @@ export default function Studio() {
             </p>
           )}
           <p className="cost-note">
-            1 portrait from your daily allowance ·{" "}
-            {session?.user
-              ? "Resets at 00:00 UTC"
-              : "Email verification before generation"}
+            {creditMode ? (
+              `${creditCost} credits per image · ${session?.user ? `${session.credits ?? 0} available` : "Email verification before generation"}`
+            ) : (
+              <>
+                1 portrait from your daily allowance ·{" "}
+                {session?.user
+                  ? "Resets at 00:00 UTC"
+                  : "Email verification before generation"}
+              </>
+            )}
           </p>
+          {creditMode && (
+            <p className="cost-note">
+              <a href="/pricing">View credit plans</a> · Failed generations
+              return credits. Pending requests keep their reservation.
+            </p>
+          )}
+          {session?.billingHold && (
+            <p role="alert" className="error">
+              Your billing account needs a review.{" "}
+              <a href="/account">Open account</a>.
+            </p>
+          )}
           {session?.user && (
             <div className="account">
               <span>{session.user.email}</span>
@@ -677,7 +744,9 @@ export default function Studio() {
                   <span className="section-kicker">
                     FRESH FROM THE DARKROOM
                   </span>
-                  <h3>Your retro moment.</h3>
+                  <h3>
+                    {figurine ? "Your miniature moment." : "Your retro moment."}
+                  </h3>
                 </div>
                 <Check size={22} />
               </div>
@@ -706,7 +775,9 @@ export default function Studio() {
                       src={`/api/portraits/${result.id}/image`}
                       alt={`Your AI portrait in ${jobStyle.name} style`}
                     />
-                    <figcaption>AI portrait</figcaption>
+                    <figcaption>
+                      {figurine ? "AI figurine" : "AI portrait"}
+                    </figcaption>
                   </figure>
                 </div>
               ) : (
@@ -714,7 +785,11 @@ export default function Studio() {
                   <div className="slider-images">
                     <img
                       src={`/api/portraits/${result.id}/image`}
-                      alt="Your generated retro portrait"
+                      alt={
+                        figurine
+                          ? "Your generated collectible figurine"
+                          : "Your generated retro portrait"
+                      }
                     />
                     <img
                       className="slider-original"
@@ -749,7 +824,7 @@ export default function Studio() {
                   onClick={() => download("portrait")}
                 >
                   <Download size={17} />
-                  Download portrait
+                  {figurine ? "Download figurine" : "Download portrait"}
                 </button>
                 <button
                   className="secondary"
@@ -782,7 +857,11 @@ export default function Studio() {
                 <div />
               </div>
               <LoaderCircle size={28} className="spin" />
-              <h3>A little time travel.</h3>
+              <h3>
+                {figurine
+                  ? "A little sculpting time."
+                  : "A little time travel."}
+              </h3>
               <p>
                 Your photo is being developed. This can take a few minutes. You
                 can reconnect to this request if the page closes.
@@ -805,7 +884,9 @@ export default function Studio() {
               </h3>
               <p>
                 {result?.status === "failed"
-                  ? "The generation could not be completed. Your portrait allowance has been restored. Try a clear, well-lit selfie."
+                  ? creditMode
+                    ? "The generation could not be completed. Your credits have been restored with their original expiry. Try a clear, well-lit selfie."
+                    : "The generation could not be completed. Your portrait allowance has been restored. Try a clear, well-lit selfie."
                   : result?.status === "expired"
                     ? "The private photo window has ended. Choose a selfie to start a new portrait."
                     : "We haven’t confirmed a finished result. Checking this request won’t start another generation. An uncertain request keeps its allowance reserved."}
@@ -834,14 +915,16 @@ export default function Studio() {
             <>
               <div className="preview-topline">
                 <span>THE LOOK</span>
-                <span>VOL. 01 / 1980—1989</span>
+                <span>
+                  {figurine ? "THE COLLECTIBLE EDITION" : "VOL. 01 / 1980—1989"}
+                </span>
               </div>
               <div className="photo-print">
                 <div className="print-image">
                   <Image
                     key={preset}
                     src={activeStyle.image}
-                    alt={`AI-created style demonstration: ${activeStyle.name}, a fictional woman in retro styling`}
+                    alt={`AI-created ${activeStyle.name} style demonstration featuring a fictional adult`}
                     fill
                     sizes="(max-width: 700px) 80vw, 400px"
                     priority
@@ -855,9 +938,9 @@ export default function Studio() {
               <div className="preview-bottom">
                 <span className="demo-label">AI-CREATED DEMONSTRATION</span>
                 <p>
-                  A different decade.
+                  {figurine ? "A smaller scale." : "A different decade."}
                   <br />
-                  <em>Still unmistakably you.</em>
+                  <em>A new way to see yourself.</em>
                 </p>
                 <span className="demo-disclosure">
                   Fictional model · style inspiration, not a tested product
@@ -898,9 +981,13 @@ export default function Studio() {
         <span className="upload-icon">
           <Mail size={24} />
         </span>
-        <h2 id="auth-title">Your ticket to the 80s.</h2>
+        <h2 id="auth-title">
+          {figurine ? "Your next creative idea." : "Your ticket to the 80s."}
+        </h2>
         <p>
-          Verify your email for 3 portraits a day. No password or payment
+          {creditMode
+            ? "Verify your email to use your credits. No password"
+            : "Verify your email for 3 portraits a day. No password or payment"}
           needed.
         </p>
         <form

@@ -14,20 +14,18 @@ describe("read-only fal model discovery", () => {
     expect(options!.url.searchParams.get("q")).toBe("background removal");
     expect(options!.url.searchParams.has("query")).toBe(false);
     expect(options!.url.searchParams.get("cursor")).toBe("Mg==");
-    const fetcher = vi
-      .fn()
-      .mockResolvedValue(
-        Response.json({
-          models: [
-            {
-              endpoint_id: "fal-ai/example",
-              metadata: { category: "image-to-image" },
-            },
-          ],
-          next_cursor: "Mw==",
-          has_more: true,
-        }),
-      );
+    const fetcher = vi.fn().mockResolvedValue(
+      Response.json({
+        models: [
+          {
+            endpoint_id: "fal-ai/example",
+            metadata: { category: "image-to-image" },
+          },
+        ],
+        next_cursor: "Mw==",
+        has_more: true,
+      }),
+    );
     const result = await discover(options!, "test-key", fetcher);
     expect(fetcher.mock.calls[0][1]).toMatchObject({
       method: "GET",

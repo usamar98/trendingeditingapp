@@ -3,6 +3,9 @@ import AxeBuilder from "@axe-core/playwright";
 
 const paths = [
   "/",
+  "/pricing",
+  "/tools/ai-retro-portraits",
+  "/tools/ai-figurine-generator",
   "/guides",
   "/guides/1980s-ai-photo-prompts",
   "/guides/better-ai-portrait-likeness",
@@ -119,7 +122,9 @@ test("guides and about page remain accessible and fit mobile screens", async ({
       path,
     ).toEqual([]);
     if (path.endsWith("1980s-ai-photo-prompts")) {
-      await page.screenshot({ path: `test-results/${info.project.name}-guide-top.png` });
+      await page.screenshot({
+        path: `test-results/${info.project.name}-guide-top.png`,
+      });
       await page.screenshot({
         path: `test-results/${info.project.name}-guide.png`,
         fullPage: true,

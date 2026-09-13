@@ -1,46 +1,53 @@
+import Link from "next/link";
 import Image from "next/image";
 import {
-  ArrowDown,
   ArrowUpRight,
-  Camera,
+  ArrowRight,
+  Sparkles,
   ScanFace,
   Download,
   Plus,
 } from "lucide-react";
 import { Header, Footer } from "@/components/chrome";
-import Studio from "@/components/studio";
-import { PRESETS } from "@/lib/presets";
-import { siteUrl } from "@/lib/site";
-import { jsonLd } from "@/lib/seo";
 import { GuideCards } from "@/components/guide-cards";
-const faqs = [
+import { PricingCards } from "@/components/pricing-cards";
+import { TOOL_CATALOG } from "@/lib/tools";
+import { siteUrl } from "@/lib/site";
+import { jsonLd, pageMetadata } from "@/lib/seo";
+import { billingConfigured } from "@/lib/server/stripe";
+export const metadata = pageMetadata(
+  "AI Photo Tools — Retro Portraits & Figurine Generator",
+  "Create a new version of your photo with EditingApp. Explore 80s AI retro portraits and collectible figurine images, review results and download your favorites.",
+  "/",
+);
+const FAQS = [
   [
-    "What is an AI retro portrait?",
-    "It’s a new image made from your reference selfie, with styling inspired by a past decade. EditingApp changes the clothing, hair, light and photographic texture to create a 1980s look. It is an AI interpretation, not a restored historical photograph.",
+    "What can I create with EditingApp?",
+    "Turn a reference photo into an AI retro portrait or an image of a collectible figurine. Each tool has its own styles and upload workspace. The figurine tool creates an image, not a physical toy or a 3D-printable file.",
   ],
   [
-    "Will the portrait still look like me?",
-    "The editing instructions prioritize your facial proportions, skin tone, age and distinctive features. Likeness is not guaranteed: AI can change small details or expressions. Compare the result with your original and review your eyes, nose, mouth and hairline before downloading.",
+    "Will the result still look like me?",
+    "The instructions prioritize recognizable facial features, age and skin tone. AI can still change details. Compare the original and result carefully before downloading; likeness is not guaranteed.",
   ],
   [
-    "Which selfie should I upload?",
-    "Use one clear face, evenly lit and looking toward the camera. Avoid sunglasses, heavy filters and distant group shots. Upload a still JPG, PNG or WebP under 4 MB, at least 256 × 256 pixels, and no larger than 16 megapixels. HEIC photos need to be exported as JPG first.",
+    "How do credits work?",
+    "A standard image uses 3 credits and high detail uses 8. Paid monthly plans add credits after each successful renewal; yearly plans issue twelve months of credits after the yearly payment. Credits expire at the end of their paid period. Your studio shows the current credits or allowance before submission.",
   ],
   [
-    "How much does a portrait cost?",
-    "The initial release offers 3 generations per verified email each day, resetting at 00:00 UTC. Each request uses one generation, including high detail. No payment is collected. A confirmed failed generation restores your allowance; an uncertain request keeps it reserved until its outcome is known. A shared site limit may also temporarily pause generation.",
+    "Which photo should I upload?",
+    "Use one clearly visible face in a still JPG, PNG or WebP under 4 MB. Each side must be at least 256 pixels and the image must be no larger than 16 megapixels. For a figurine, a waist-up or full-body photo gives more clothing information. Convert HEIC to JPG first.",
   ],
   [
-    "What happens to my photo?",
-    "Before you generate, your selfie is only previewed in your browser. When you submit, EditingApp sends it through fal to an OpenAI image model and stores a metadata-stripped copy and the result in private Supabase storage. Access expires after 24 hours. Automatic deletion requires scheduled cleanup; without it, files remain privately stored until deleted. You can delete your photos after processing. Separate provider retention policies apply; see Photo privacy.",
+    "What happens if generation fails?",
+    "A confirmed failure restores the reserved credits to their original expiry. If the outcome is uncertain, credits stay reserved while you check the same request. Use Check request after a connection interruption; submitting again would start a different generation.",
+  ],
+  [
+    "Are my photos public?",
+    "No public gallery is created. Your selfie is previewed locally until you generate. Submitted photos are processed through fal and stored privately. Access expires after 24 hours; automatic deletion requires scheduled cleanup. You can delete photos manually after processing. Separate provider retention policies apply.",
   ],
   [
     "Can I download a before-and-after image?",
-    "Yes. Review your original and AI portrait side by side or use the comparison slider. Download the portrait as a 1024 × 1536 PNG or save a labeled before-and-after image. The comparison is composed in your browser and is not published to a public gallery.",
-  ],
-  [
-    "How long does generation take?",
-    "Allow a few minutes; processing time depends on provider demand and detail level. EditingApp shows the state of your actual request rather than a made-up progress percentage. If the connection is interrupted, use Check request. It checks for the same portrait without generating another one.",
+    "Yes. Review your original and result side by side or with the comparison slider, then save the portrait PNG or a labeled comparison. Downloads do not automatically post to Instagram, TikTok or another social account.",
   ],
 ];
 export default function Home() {
@@ -52,7 +59,7 @@ export default function Home() {
       name: "EditingApp",
       url: siteUrl(),
       description:
-        "EditingApp creates AI retro portraits from reference selfies.",
+        "AI photo tools for retro portraits and collectible figurine images.",
     },
     {
       "@context": "https://schema.org",
@@ -65,30 +72,14 @@ export default function Home() {
     },
     {
       "@context": "https://schema.org",
-      "@type": "WebApplication",
-      name: "EditingApp AI Retro Portrait Generator",
-      "@id": siteUrl("/#app"),
-      url: siteUrl(),
-      publisher: { "@id": siteUrl("/#organization") },
-      isAccessibleForFree: true,
-      offers: {
-        "@type": "Offer",
-        price: 0,
-        priceCurrency: "USD",
-        description:
-          "Initial release: 3 attempts per verified email per day, subject to a shared site limit. No payment collected.",
-      },
-      applicationCategory: "PhotographyApplication",
-      operatingSystem: "Web browser",
-      description:
-        "Create an AI retro portrait from a reference selfie, compare it with the original, and download the result.",
-      featureList: [
-        "80s Studio",
-        "Retro Cinema",
-        "Vintage Family Album",
-        "Original and result comparison",
-        "Portrait and before-and-after downloads",
-      ],
+      "@type": "ItemList",
+      name: "EditingApp AI photo tools",
+      itemListElement: TOOL_CATALOG.map((tool, index) => ({
+        "@type": "ListItem",
+        position: index + 1,
+        name: tool.name,
+        url: siteUrl(`/tools/${tool.slug}`),
+      })),
     },
   ];
   return (
@@ -97,163 +88,162 @@ export default function Home() {
       <main id="main">
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{
-            __html: jsonLd(structured),
-          }}
+          dangerouslySetInnerHTML={{ __html: jsonLd(structured) }}
         />
-        <section className="intro">
-          <div className="intro-copy">
+        <section className="hub-hero">
+          <div className="hub-hero-copy">
             <p className="eyebrow">
-              <span /> AI RETRO PORTRAIT GENERATOR
+              <Sparkles size={15} /> A LITTLE IMAGINATION. A LOT OF YOU.
             </p>
             <h1>
-              Your face.
+              AI photo tools.
               <br />
-              <span>An 80s AI portrait.</span>
+              <span>Your next alter ego.</span>
             </h1>
-            <p className="intro-description">
-              Turn your selfie into a realistic 1980s-style photo. Choose
-              studio, cinema or vintage album styling, compare your face, and
-              keep your favorite.
+            <p>
+              A throwback portrait. A miniature you. Find a new way to see
+              yourself—with simple tools made for your next creative idea.
             </p>
+            <a href="#tools" className="primary">
+              Find your next look <ArrowRight size={18} />
+            </a>
+            <div className="hero-details">
+              <span>Photo in. Possibility out.</span>
+              <span>Review before you download.</span>
+            </div>
           </div>
-          <div className="intro-aside">
-            <div className="year-mark">
-              19<span>80</span>
-              <span className="year-star">✳</span>
+          <figure className="hero-collectible">
+            <Image
+              src="/images/figurine-desk.png"
+              alt="AI-created demonstration of a fictional woman as a miniature desk collectible"
+              width={1024}
+              height={1536}
+              sizes="(max-width: 700px) 75vw, 380px"
+              priority
+            />
+            <figcaption>
+              <span>THE MINI-ME EDITION</span>
+              <strong>A new kind of self-portrait.</strong>
+              <small>Fictional AI-created demonstration</small>
+            </figcaption>
+          </figure>
+        </section>
+        <section id="tools" className="tools-section">
+          <span id="studio" />
+          <div className="section-title split">
+            <div>
+              <p className="eyebrow">YOUR CREATIVE TOOLBOX</p>
+              <h2>Pick a possibility.</h2>
             </div>
             <p>
-              THE AI RETRO
+              One photo. A style that speaks to you.
               <br />
-              PORTRAIT GENERATOR
+              Each tool has its own little studio.
             </p>
-            <a href="#studio" aria-label="Go to the portrait studio">
-              <ArrowDown size={20} />
-            </a>
           </div>
+          <div className="tool-grid">
+            {TOOL_CATALOG.map((tool) => (
+              <article
+                className={`tool-card ${tool.id === "ai-figurine" ? "figurine-card" : ""}`}
+                key={tool.id}
+              >
+                <Link
+                  className="tool-card-image"
+                  href={`/tools/${tool.slug}`}
+                  aria-label={`Explore ${tool.name}`}
+                >
+                  <Image
+                    src={tool.image}
+                    alt={tool.alt}
+                    fill
+                    sizes="(max-width: 700px) 90vw, 45vw"
+                  />
+                  <span>{tool.badge}</span>
+                </Link>
+                <div className="tool-card-content">
+                  <p className="eyebrow">{tool.category}</p>
+                  <h3>
+                    <Link href={`/tools/${tool.slug}`}>{tool.name}</Link>
+                  </h3>
+                  <p>{tool.description}</p>
+                  <div className="tool-card-bottom">
+                    <span>3 credits / standard image</span>
+                    <Link href={`/tools/${tool.slug}`}>
+                      Open studio <ArrowUpRight size={17} />
+                    </Link>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+          <p className="gallery-disclosure">
+            All examples are AI-created demonstrations with fictional people,
+            not tested customer results. Availability and your current allowance
+            are shown inside each studio.
+          </p>
         </section>
-        <Studio />
         <section className="how-section" id="how-it-works">
           <div className="section-title">
-            <p className="eyebrow">NO PROMPT WRITING REQUIRED</p>
-            <h2>Your throwback, in a few steps.</h2>
+            <p className="eyebrow">SMALL STEPS. A NEW PERSPECTIVE.</p>
+            <h2>Make it yours in a few steps.</h2>
           </div>
           <div className="steps">
             <article>
               <span className="step-icon">
-                <Camera size={24} />
+                <Sparkles size={24} />
               </span>
-              <span className="step-num">01 / PICK & UPLOAD</span>
-              <h3>Find your kind of retro.</h3>
+              <span className="step-num">01 / FIND YOUR LOOK</span>
+              <h3>Choose a tool and style.</h3>
               <p>
-                Choose a visual style and add one clear selfie. A well-lit face
-                gives the edit a better starting point.
+                Explore a new visual direction, then open its studio. Every tool
+                shows its options and credit cost before you submit.
               </p>
             </article>
             <article>
               <span className="step-icon">
                 <ScanFace size={24} />
               </span>
-              <span className="step-num">02 / GENERATE & REVIEW</span>
-              <h3>Meet your other-decade self.</h3>
+              <span className="step-num">02 / UPLOAD & REVIEW</span>
+              <h3>Keep the details that matter.</h3>
               <p>
-                Check your allowance, generate a portrait, then compare the
-                details against your original.
+                Start with a clear photo. Generate once and compare the result
+                with your reference, giving your face a careful look.
               </p>
             </article>
             <article>
               <span className="step-icon">
                 <Download size={24} />
               </span>
-              <span className="step-num">03 / KEEP THE MEMORY</span>
-              <h3>Ready for the family album.</h3>
+              <span className="step-num">03 / SAVE YOUR FAVORITE</span>
+              <h3>A keeper, on your terms.</h3>
               <p>
-                Save your favorite portrait or a before-and-after image. You
-                decide what leaves your private studio.
+                Download your image or a labeled before-and-after. You decide
+                what to share and what stays in your private studio.
               </p>
             </article>
           </div>
         </section>
-        <section className="styles-section" id="styles">
-          <div className="section-title split">
-            <div>
-              <p className="eyebrow">THREE WAYS TO TURN BACK TIME</p>
-              <h2>Find your retro personality.</h2>
-            </div>
+        <section className="home-pricing" id="plans">
+          <div className="section-title">
+            <p className="eyebrow">KEEP YOUR IDEAS COMING</p>
+            <h2>A little room. Or a whole studio.</h2>
             <p>
-              Soft studio flash, a cinematic mood,
-              <br />
-              or a memory from the mantelpiece.
+              One credit balance across the available tools. Choose monthly or
+              save with a yearly plan.
             </p>
           </div>
-          <div className="style-gallery">
-            {PRESETS.map((p, i) => (
-              <article key={p.id}>
-                <div className="gallery-image">
-                  <Image
-                    src={p.image}
-                    alt={`AI-created ${p.name} demo: ${i === 0 ? "cream blazer, big hair and blue backdrop" : i === 1 ? "burgundy clothing with teal and amber lighting" : "knitwear and warm window light"}`}
-                    fill
-                    sizes="(max-width: 700px) 90vw, 33vw"
-                  />
-                  <span>0{i + 1}</span>
-                </div>
-                <div className="gallery-caption">
-                  <div>
-                    <p className="eyebrow">{p.eyebrow}</p>
-                    <h3>{p.name}</h3>
-                  </div>
-                  <a
-                    href="#studio"
-                    aria-label={`Explore ${p.name} in the studio`}
-                  >
-                    <ArrowUpRight size={23} />
-                  </a>
-                </div>
-                <p>{p.description}</p>
-              </article>
-            ))}
-          </div>
-          <p className="gallery-disclosure">
-            AI-created demonstrations featuring a fictional model. These
-            illustrate the styles and are not outputs from a tested user
-            generation.
-          </p>
-        </section>
-        <section className="editorial">
-          <span className="editorial-star">✳</span>
-          <div>
-            <p className="eyebrow">MORE THAN A VINTAGE FILTER</p>
-            <h2>It’s the details that make a decade.</h2>
-            <p>
-              A retro filter changes a photo’s color. An AI retro portrait can
-              also reimagine the clothes, hairstyle, backdrop and lighting. Our
-              presets pair those details with instructions to preserve your
-              recognizable facial features.
-            </p>
-            <p>
-              For a believable 80s photo, start with a simple selfie and let the
-              styling do the work. Review the face carefully and label shared
-              results as AI-created. A convincing throwback should still feel
-              like you.
-            </p>
-            <a className="text-link" href="#studio">
-              Create your own retro portrait <ArrowUpRight size={17} />
-            </a>
-          </div>
+          <PricingCards ready={billingConfigured()} />
         </section>
         <section className="home-guides" aria-labelledby="guides-heading">
           <div className="section-title">
-            <p className="eyebrow">A LITTLE HELP WITH YOUR THROWBACK</p>
-            <h2 id="guides-heading">
-              80s photo ideas. Better starting points.
-            </h2>
+            <p className="eyebrow">THE EDITINGAPP NOTEBOOK</p>
+            <h2 id="guides-heading">Good starting points. Better keepsakes.</h2>
           </div>
           <GuideCards />
         </section>
         <section className="faq-section" id="faq">
           <div>
-            <p className="eyebrow">BEFORE YOUR TIME TRAVEL</p>
+            <p className="eyebrow">BEFORE YOUR NEXT IDEA</p>
             <h2>
               A few things
               <br />
@@ -261,7 +251,7 @@ export default function Home() {
             </h2>
           </div>
           <div className="faq-list">
-            {faqs.map(([question, answer]) => (
+            {FAQS.map(([question, answer]) => (
               <details key={question}>
                 <summary>
                   {question}
@@ -269,10 +259,11 @@ export default function Home() {
                 </summary>
                 <p>
                   {answer}
-                  {question === "What happens to my photo?" && (
+                  {question === "Are my photos public?" && (
                     <>
                       {" "}
-                      Read the <a href="/privacy">full photo privacy notice</a>.
+                      <Link href="/privacy">Read the photo privacy notice</Link>
+                      .
                     </>
                   )}
                 </p>

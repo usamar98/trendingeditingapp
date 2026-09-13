@@ -1,20 +1,32 @@
 import { createHash } from "node:crypto";
-import { sameOrigin } from "@/lib/server/config";
+import { sameOrigin, creditsEnabled, requireConfig } from "@/lib/server/config";
 import { requireUser } from "@/lib/server/supabase";
 import { normalizePhoto, uploadForm } from "@/lib/server/upload";
-import { reserveJob, runJob, publicJob } from "@/lib/server/jobs";
-import { PRESETS, type Preset, type Quality } from "@/lib/presets";
+import {
+  reserveJob,
+  reserveCreditJob,
+  runJob,
+  publicJob,
+} from "@/lib/server/jobs";
+import { type Preset, type Quality } from "@/lib/presets";
 import { FEATURES } from "@/lib/server/ai/registry";
 import { AppError, errorResponse } from "@/lib/errors";
+import {
+  toolForFeature,
+  type ImageFeature,
+  type ImagePreset,
+} from "@/lib/tools";
 export const runtime = "nodejs";
 export const maxDuration = 300;
 export async function POST(request: Request) {
   try {
     sameOrigin(request);
     const user = await requireUser();
+    requireConfig();
     const form = await uploadForm(request);
     const id = form.get("requestId");
     const preset = form.get("preset");
+    const featureId = form.get("featureId") || "retro-portrait";
     const quality = form.get("quality");
     const file = form.get("photo");
     if (
@@ -25,7 +37,10 @@ export async function POST(request: Request) {
     )
       throw new AppError("ID", "Invalid portrait request.");
     if (
-      !PRESETS.some((p) => p.id === preset) ||
+      !["retro-portrait", "ai-figurine"].includes(String(featureId)) ||
+      !toolForFeature(featureId as ImageFeature)?.presets.some(
+        (p) => p.id === preset,
+      ) ||
       !["medium", "high"].includes(String(quality))
     )
       throw new AppError("PRESET", "Choose one of the available styles.");
@@ -37,20 +52,32 @@ export async function POST(request: Request) {
     if (!(file instanceof File))
       throw new AppError("PHOTO", "Choose a photo first.");
     const photo = await normalizePhoto(file);
-    const feature = FEATURES["retro-portrait"];
+    if (featureId !== "retro-portrait" && !creditsEnabled())
+      throw new AppError(
+        "CREDITS_SETUP",
+        "The figurine studio is not available yet. Try the retro portrait studio while we finish connecting it.",
+        503,
+      );
+    const feature = FEATURES[featureId as ImageFeature];
     const fingerprint = createHash("sha256")
       .update(photo)
       .update(
-        `:${preset}:${quality}:fal:${feature.endpoint}:${feature.version}`,
+        `:${preset}:${quality}:fal:${feature.endpoint}:${feature.version}:${featureId}:${creditsEnabled() ? "credits-v1" : "legacy"}`,
       )
       .digest("hex");
-    const reservation = await reserveJob({
+    const input = {
       id,
       userId: user.id,
       fingerprint,
-      preset: preset as Preset,
+      preset: preset as ImagePreset,
       quality: quality as Quality,
-    });
+    };
+    const reservation = creditsEnabled()
+      ? await reserveCreditJob({
+          ...input,
+          featureId: featureId as ImageFeature,
+        })
+      : await reserveJob({ ...input, preset: preset as Preset });
     const job = reservation.fresh
       ? await runJob(reservation.job, photo)
       : reservation.job;

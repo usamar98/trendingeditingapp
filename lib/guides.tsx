@@ -232,9 +232,11 @@ export const GUIDES: Guide[] = [
             <ol>
               <li>
                 <strong>Choose a style.</strong> Open the{" "}
-                <Link href="/#studio">AI retro portrait generator</Link> and
-                select 80s Studio, Retro Cinema or Vintage Family Album. You can
-                inspect the demonstration before uploading.
+                <Link href="/tools/ai-retro-portraits#studio">
+                  AI retro portrait generator
+                </Link>{" "}
+                and select 80s Studio, Retro Cinema or Vintage Family Album. You
+                can inspect the demonstration before uploading.
               </li>
               <li>
                 <strong>Add your selfie.</strong> Use one clear face in a JPG,
@@ -242,11 +244,10 @@ export const GUIDES: Guide[] = [
                 be at least 256 × 256 pixels and at most 16 megapixels.
               </li>
               <li>
-                <strong>Check the allowance.</strong> The initial release
-                includes three attempts per verified email each day, resetting
-                at 00:00 UTC. No payment is collected. The studio shows your
-                remaining allowance before submission; a shared site limit can
-                also apply.
+                <strong>Check the cost.</strong> A standard image uses 3 credits
+                and high detail uses 8 under credit plans. The studio shows your
+                current credits or allowance before submission. Choose a detail
+                level you can afford; shared service limits also apply.
               </li>
               <li>
                 <strong>Generate and review.</strong> Confirm you have
@@ -394,7 +395,8 @@ export const GUIDES: Guide[] = [
               experiment than changing the source, style and detail setting
               together. Keep track of what you changed so that you can decide
               whether it helped. Each new submission uses another attempt; there
-              is no need to use your entire daily allowance on repeated guesses.
+              is no need to use all your credits or allowance on repeated
+              guesses.
             </p>
           </>
         ),
@@ -545,9 +547,9 @@ export const GUIDES: Guide[] = [
             <p>
               If the app asks you to verify your email, finish signing in before
               generating. To retrieve a previous private portrait, use the same
-              email account. Expired photo access and a daily allowance limit
-              are also different conditions; creating a new account or
-              repeatedly submitting the form is not a useful fix for either.
+              email account. Expired photo access and a usage limit are also
+              different conditions; creating a new account or repeatedly
+              submitting the form is not a useful fix for either.
             </p>
             <p>
               The studio reports actual request states rather than a guaranteed
@@ -588,8 +590,10 @@ export const GUIDES: Guide[] = [
               Label a shared image as AI-created and make sure you are
               comfortable sharing the original if you use the comparison. When
               you are ready, return to the{" "}
-              <Link href="/#studio">portrait studio</Link>, pick a style and
-              start with your clearest selfie.
+              <Link href="/tools/ai-retro-portraits#studio">
+                portrait studio
+              </Link>
+              , pick a style and start with your clearest selfie.
             </p>
           </>
         ),

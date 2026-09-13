@@ -55,10 +55,12 @@ describe("public SEO URLs", () => {
     for (const guide of GUIDES)
       expect(entries).toContainEqual({
         url: siteUrl(`/guides/${guide.slug}`),
-        lastModified: guide.published,
+        lastModified: "2026-09-13",
       });
     for (const entry of entries) {
-      expect(new URL(entry.url).pathname).not.toMatch(/\/\/|^\/api|^\/auth/);
+      expect(new URL(entry.url).pathname).not.toMatch(
+        /\/\/|^\/api|^\/auth|^\/account/,
+      );
       expect(entry.lastModified).toMatch(/^\d{4}-\d{2}-\d{2}$/);
       expect(entry).not.toHaveProperty("priority");
       expect(entry).not.toHaveProperty("changeFrequency");

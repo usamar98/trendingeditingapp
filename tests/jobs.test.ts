@@ -7,13 +7,17 @@ const fake = vi.hoisted(() => ({
   uploadFailure: false,
   updateFailure: false,
   provider: vi.fn(),
+  feature: vi.fn(),
+  settle: vi.fn(),
 }));
+vi.mock("@/lib/server/ai/features", () => ({ runFeature: fake.feature }));
 vi.mock("@/lib/server/provider", async (original) => {
   const real = await original<typeof import("@/lib/server/provider")>();
   return { ...real, editPortrait: fake.provider };
 });
 vi.mock("@/lib/server/supabase", () => ({
   admin: () => ({
+    rpc: fake.settle,
     from: () => ({
       update: (values: Record<string, unknown>) => {
         const chain = {
@@ -62,6 +66,8 @@ import { ProviderError } from "@/lib/server/provider";
 beforeEach(() => {
   fake.objects.clear();
   fake.provider.mockReset();
+  fake.feature.mockReset();
+  fake.settle.mockReset().mockResolvedValue({ error: null });
   fake.uploadFailure = false;
   fake.updateFailure = false;
   fake.job = {
@@ -77,6 +83,70 @@ beforeEach(() => {
   };
 });
 describe("generation lifecycle with fake provider and storage", () => {
+  it("persists a figurine result through the reviewed feature without calling the retro adapter", async () => {
+    const png = await sharp({
+      create: { width: 1024, height: 1536, channels: 3, background: "#ccc" },
+    })
+      .png()
+      .toBuffer();
+    Object.assign(fake.job, {
+      feature_id: "ai-figurine",
+      preset: "figurine-box",
+      credits_charged: 8,
+      quality: "high",
+    });
+    fake.feature.mockResolvedValue({
+      bytes: png,
+      requestId: "req_figure",
+      usage: null,
+    });
+    const job = await runJob({ ...fake.job } as Job, Buffer.from("reference"));
+    expect(job.status).toBe("succeeded");
+    expect(job.feature_id).toBe("ai-figurine");
+    expect(fake.objects.size).toBe(2);
+    expect(fake.feature).toHaveBeenCalledWith("ai-figurine", {
+      photo: Buffer.from("reference"),
+      preset: "figurine-box",
+      quality: "high",
+    });
+    expect(fake.provider).not.toHaveBeenCalled();
+    expect(fake.settle).not.toHaveBeenCalled();
+  });
+  it("settles failed credit jobs atomically while preserving uncertain reservations", async () => {
+    Object.assign(fake.job, {
+      feature_id: "ai-figurine",
+      preset: "figurine-desk",
+      credits_charged: 3,
+    });
+    fake.feature.mockRejectedValue(
+      new ProviderError(false, "PROVIDER_REJECTED"),
+    );
+    await runJob({ ...fake.job } as Job, Buffer.from("reference"));
+    expect(fake.settle).toHaveBeenLastCalledWith(
+      "settle_image_failure",
+      expect.objectContaining({
+        p_id: fake.job.id,
+        p_user_id: "user",
+        p_uncertain: false,
+      }),
+    );
+    fake.feature.mockRejectedValue(
+      new ProviderError(true, "CONNECTION_UNCERTAIN"),
+    );
+    await runJob({ ...fake.job } as Job, Buffer.from("reference"));
+    expect(fake.settle).toHaveBeenLastCalledWith(
+      "settle_image_failure",
+      expect.objectContaining({ p_uncertain: true }),
+    );
+    fake.feature.mockClear();
+    fake.uploadFailure = true;
+    await runJob({ ...fake.job } as Job, Buffer.from("reference"));
+    expect(fake.settle).toHaveBeenLastCalledWith(
+      "settle_image_failure",
+      expect.objectContaining({ p_uncertain: false }),
+    );
+    expect(fake.feature).not.toHaveBeenCalled();
+  });
   it("stores original, validates output, completes and deletes private photos", async () => {
     const png = await sharp({
       create: { width: 1024, height: 1536, channels: 3, background: "#ccc" },

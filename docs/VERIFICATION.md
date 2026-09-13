@@ -1,5 +1,19 @@
 # Verification record
 
+## September 13 — catalog, figurines, credit accounts and Stripe
+
+The production build, ESLint and TypeScript checks passed on Node 22.14.0 with Next.js 16.3.5. **114 unit/integration tests** pass across 11 suites; **32 Chrome desktop/mobile browser tests** pass. The browser failures initially found were ambiguous selectors in new tests; these were corrected. Visual review also found a cropped figurine on the homepage; its frame now preserves the whole image.
+
+The expanded checks exercise both reviewed figurine payloads, private PNG persistence, atomic job reservations and credit settlement, concurrent overspending prevention, welcome-credit deduplication, earliest-expiry allocation, expired/revoked grants, duplicate invoice/event handling, checkout reuse after lost responses, wrong-price/customer/quantity rejection, actual Stripe HMAC verification, payment failure, refund/dispute holds, row isolation and server-only RPC privileges. A URL pretending checkout succeeded cannot change the account balance. Secrets and fixture mocks are not bundled as production results.
+
+Browser checks cover the catalog and both studios, login/signup from the header, profile editing, balance display, monthly/yearly plan amounts, selected figurine preset/detail submission, low credits, failed requests, comparison, both downloads, protected account indexing and all existing email/retro regressions. Axe reports no WCAG A/AA violations in tested states on both viewports. PNG demonstration assets are about 1.9 MB and 1.8 MB at source; Next.js Image serves optimized sizes. They are fictional AI-created examples, not credentialed product outputs.
+
+`npm run billing:setup` was syntax/runtime checked and reports the missing `STRIPE_SECRET_KEY` before API calls. No live Stripe checkout, paid invoice, fal figurine inference or hosted credit migration was performed: those credentials are absent from the local workspace. Follow `BILLING_SETUP.md` for the required credentialed acceptance tests and migration. The deployment defaults to the earlier retro allowance until the credit migration and environment flag are enabled. No mandatory cron key was introduced.
+
+Remaining limits: real figurine likeness, cost and latency need consented live tests; immediate prorated subscription upgrades and automatic refund/dispute reconciliation are not included. Existing uncertain inference cannot be automatically replayed. Keep the current Search Console property; `/sitemap.xml` contains ten public pages. No Google search-growth measurements, rankings or traffic results were claimed.
+
+## Earlier release record
+
 Completed locally on 12 September 2026 using Node 22.14.0 and Next.js 16.3.5.
 
 | Check                     | Result                                                                                                                                                                                          |

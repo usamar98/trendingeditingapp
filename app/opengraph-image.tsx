@@ -1,6 +1,5 @@
 import { ImageResponse } from "next/og";
-export const alt =
-  "EditingApp — Your face. A different decade. AI Retro Portrait Generator";
+export const alt = "EditingApp — AI Photo Tools. Retro Portraits & Figurines.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export default function OpenGraphImage() {
@@ -31,11 +30,11 @@ export default function OpenGraphImage() {
           lineHeight: 1.1,
         }}
       >
-        <span>Your face.</span>
-        <span>A different decade.</span>
+        <span>Your photo.</span>
+        <span>A new possibility.</span>
       </div>
       <div style={{ display: "flex", fontSize: 26 }}>
-        AI RETRO PORTRAITS / 80s STUDIO · RETRO CINEMA · VINTAGE ALBUM
+        AI PHOTO TOOLS / RETRO PORTRAITS · COLLECTIBLE FIGURINES
       </div>
     </div>,
     size,

@@ -2,10 +2,10 @@ import "server-only";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
-import { requireConfig } from "./config";
+import { requireAuthConfig } from "./config";
 import { AppError } from "@/lib/errors";
 export function admin() {
-  requireConfig();
+  requireAuthConfig();
   return createClient(
     process.env.SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -13,7 +13,7 @@ export function admin() {
   );
 }
 export async function authClient() {
-  requireConfig();
+  requireAuthConfig();
   const jar = await cookies();
   return createServerClient(
     process.env.SUPABASE_URL!,
@@ -42,7 +42,7 @@ export async function requireUser() {
   if (error || !data.user?.email_confirmed_at || data.user.is_anonymous)
     throw new AppError(
       "AUTH_REQUIRED",
-      "Verify your email to use your daily portrait allowance.",
+      "Sign in and verify your email to use EditingApp.",
       401,
     );
   return data.user;

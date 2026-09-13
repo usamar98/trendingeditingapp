@@ -27,9 +27,9 @@ test("landing, mobile layout, indexable SEO, invalid upload and accessibility", 
   page,
   request,
 }, info) => {
-  await page.goto("/");
+  await page.goto("/tools/ai-retro-portraits");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "Your face.An 80s AI portrait.",
+    "Your face. An 80s AI portrait.",
   );
   await expect(page.getByText("Generation is awaiting setup.")).toBeVisible();
   await page.getByRole("radio", { name: /Retro Cinema/ }).check();
@@ -62,7 +62,7 @@ test("landing, mobile layout, indexable SEO, invalid upload and accessibility", 
   const html = await (await request.get("/")).text();
   expect(html).toContain("application/ld+json");
   expect(html).toContain('rel="canonical"');
-  expect(html).toContain("What is an AI retro portrait?");
+  expect(html).toContain("What can I create with EditingApp?");
   expect((await request.get("/sitemap.xml")).status()).toBe(200);
   expect((await request.get("/robots.txt")).status()).toBe(200);
   expect((await request.get("/opengraph-image")).status()).toBe(200);
@@ -98,7 +98,7 @@ test("fixture-backed upload, generate, compare, both downloads, and delete", asy
           : { id, status: "succeeded", preset: "studio" },
     }),
   );
-  await page.goto("/");
+  await page.goto("/tools/ai-retro-portraits");
   await upload(page);
   await page
     .getByRole("button", { name: "Generate my retro portrait" })
@@ -155,7 +155,7 @@ test("fixture-backed verified email flow and failed generation recovery", async 
       },
     }),
   );
-  await page.goto("/");
+  await page.goto("/tools/ai-retro-portraits");
   await upload(page);
   await page.getByRole("button", { name: "Create my retro portrait" }).click();
   await page.getByLabel("Email address").fill("test@example.com");
@@ -204,7 +204,7 @@ test("fixture-backed link sign-in updates the original upload tab without anothe
       },
     });
   });
-  await page.goto("/");
+  await page.goto("/tools/ai-retro-portraits");
   await upload(page);
   await page.getByRole("button", { name: "Create my retro portrait" }).click();
   await page.getByLabel("Email address").fill("test@example.com");
@@ -221,7 +221,9 @@ test("fixture-backed link sign-in updates the original upload tab without anothe
   signedIn = true;
   const emailTab = await context.newPage();
   await emailTab.goto("/?auth=success#studio");
-  await expect(emailTab.getByRole("status")).toContainText("You’re signed in");
+  await expect(emailTab.locator(".account-notice")).toContainText(
+    "You’re signed in",
+  );
   await expect(emailTab).toHaveURL(/\/#studio$/);
   await expect(page.getByRole("dialog")).not.toBeVisible();
   await expect(page.getByText("Selfie ready. Change photo?")).toBeVisible();
@@ -260,7 +262,7 @@ test("fixture-backed email limit pauses resends but permits an existing code", a
     await session(page);
     return route.fulfill({ json: { ok: true } });
   });
-  await page.goto("/");
+  await page.goto("/tools/ai-retro-portraits");
   await upload(page);
   await page.getByRole("button", { name: "Create my retro portrait" }).click();
   await page.getByLabel("Email address").fill("test@example.com");
@@ -296,21 +298,23 @@ test("fixture-backed resend countdown ends without sending automatically", async
       await route.fulfill({ json: { ok: true } });
     };
   });
-  await page.goto("/");
+  await page.goto("/tools/ai-retro-portraits");
   await upload(page);
   await page.getByRole("button", { name: "Create my retro portrait" }).click();
   await page.getByLabel("Email address").fill("test@example.com");
   await page.getByRole("button", { name: "Send sign-in email" }).click();
   await expect.poll(() => sends).toBe(1);
   // Bypass the disabled button to exercise the synchronous submit lock.
-  await page.locator(".auth-dialog form").evaluate((form) => {
-    form.dispatchEvent(
-      new Event("submit", { bubbles: true, cancelable: true }),
-    );
-    form.dispatchEvent(
-      new Event("submit", { bubbles: true, cancelable: true }),
-    );
-  });
+  await page
+    .locator(".auth-dialog:not(.account-auth-dialog) form")
+    .evaluate((form) => {
+      form.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+      form.dispatchEvent(
+        new Event("submit", { bubbles: true, cancelable: true }),
+      );
+    });
   await completeSend!();
   await page
     .getByRole("button", { name: "Use another email or request a new email" })
@@ -354,7 +358,7 @@ test("fixture-backed Generate refreshes a stale signed-out session before openin
       },
     });
   });
-  await page.goto("/");
+  await page.goto("/tools/ai-retro-portraits");
   await upload(page);
   signedIn = true; // No focus or cross-tab event: force the pre-generation check.
   await page.getByRole("button", { name: "Create my retro portrait" }).click();
@@ -380,7 +384,7 @@ test("legacy email return is handled, strips its code and shows actionable expir
     });
   });
   await page.goto("/?code=fixture-old-email-code");
-  await expect(page.locator('.error[role="alert"]')).toContainText(
+  await expect(page.locator(".account-notice")).toContainText(
     "sign-in link is invalid or expired",
   );
   await expect(page).toHaveURL(/\/#studio$/);
@@ -415,7 +419,7 @@ test("fixture-backed connection loss reconnects by status, without a second POST
       },
     }),
   );
-  await page.goto("/");
+  await page.goto("/tools/ai-retro-portraits");
   await upload(page);
   await page
     .getByRole("button", { name: "Generate my retro portrait" })

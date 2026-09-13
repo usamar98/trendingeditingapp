@@ -23,6 +23,37 @@ const success = () =>
 const generate = () => editPortrait(Buffer.from("selfie"), "studio", "medium");
 
 describe("fal API adapter contract (mocked network)", () => {
+  it.each(["figurine-desk", "figurine-box"] as const)(
+    "routes %s through the reviewed private image adapter",
+    async (preset) => {
+      const fetch = vi.fn().mockResolvedValue(success());
+      vi.stubGlobal("fetch", fetch);
+      await runFeature("ai-figurine", {
+        photo: Buffer.from("selfie"),
+        preset,
+        quality: "high",
+      });
+      expect(fetch).toHaveBeenCalledTimes(1);
+      const [url, options] = fetch.mock.calls[0];
+      expect(url).toBe("https://fal.run/openai/gpt-image-2.5/sunburst/edit");
+      const payload = JSON.parse(options.body);
+      expect(payload).toMatchObject({
+        quality: "high",
+        num_images: 1,
+        sync_mode: true,
+        output_format: "png",
+        image_size: { width: 1024, height: 1536 },
+      });
+      expect(payload.image_urls).toEqual(["data:image/jpeg;base64,c2VsZmll"]);
+      expect(payload.prompt).toContain(
+        "Preserve recognizable facial proportions",
+      );
+      expect(payload.prompt).toContain(
+        preset === "figurine-box" ? "presentation box" : "acrylic display base",
+      );
+      expect(options.headers["X-Fal-Store-IO"]).toBe("0");
+    },
+  );
   it("uses the documented Sunburst endpoint, reference input, size and inline output", async () => {
     const fetch = vi.fn().mockResolvedValue(success());
     vi.stubGlobal("fetch", fetch);

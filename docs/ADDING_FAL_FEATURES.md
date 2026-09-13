@@ -1,6 +1,6 @@
 # Adding a feature from fal
 
-The application separates model discovery, feature-specific mapping, shared HTTP transport, and authenticated job handling. Only the retro portrait feature is enabled today.
+The application separates model discovery, feature-specific mapping, shared HTTP transport, and authenticated job handling. Retro portraits and figurine images are registered. Figurines require the credit migration and `CREDITS_ENABLED=true`; see `BILLING_SETUP.md`.
 
 ## 1. Find the supported API
 
@@ -39,7 +39,9 @@ The shared `fal.ts` client sends one POST to `https://fal.run/<registered endpoi
 
 Provide an authenticated route with upload/body validation, explicit consent and visible usage allowance. Reserve usage and an idempotency key **atomically before calling `runFeature`**. Reuse existing records on duplicate requests. Record the feature/provider/model and keep all media private.
 
-The current `portrait_jobs` schema intentionally supports only the three portrait presets and PNG portraits. A new product workflow needs an appropriate migration/job contract and cleanup logic; do not force arbitrary video/audio output into this table or assume the portrait quota is suitable. Different media must have suitable size limits, decoders, downloads and access policies.
+The current `portrait_jobs` schema supports three retro presets and two figurine presets, all with private PNG output. Add an entry to `TOOL_CATALOG` in `lib/tools.ts` with the feature ID, slug, reviewed demo image, clear description, metadata and presets. Homepage cards, static tool routes and sitemap entries derive from this catalog. Add original tool instructions and examples in the shared tool page as appropriate; do not mass-produce thin pages.
+
+Add credit/cost entries in `generation_prices` through a migration, update the permitted feature/preset checks in `reserve_image_job`, and match the visible cost in `lib/plans.ts`. Preserve atomic credit allocation, expiry and idempotent failure refunds. A new media workflow needs an appropriate job contract and cleanup logic; do not force arbitrary video/audio output into this table or assume image credit costs are suitable. Different media must have suitable size limits, decoders, downloads and access policies.
 
 Inline input and `sync_mode` are documented for Sunburst, not universal fal capabilities. Models without inline output need a reviewed private file-access strategy, allowlisted output hosts, bounded downloads and prompt cleanup. The existing decoder intentionally rejects remote URLs. Do not weaken it globally to make an unrelated model work.
 

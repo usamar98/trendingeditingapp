@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Aperture, ArrowUpRight } from "lucide-react";
+import { Aperture } from "lucide-react";
+import { AccountMenu } from "./account-menu";
 export function Header() {
   return (
     <header className="site-header">
@@ -10,13 +11,11 @@ export function Header() {
         EditingApp<span className="brand-period">.</span>
       </Link>
       <nav aria-label="Main navigation">
-        <Link href="/#how-it-works">How it works</Link>
-        <Link href="/#styles">The styles</Link>
+        <Link href="/#tools">All tools</Link>
+        <Link href="/pricing">Pricing</Link>
         <Link href="/guides">Photo guides</Link>
       </nav>
-      <Link className="header-cta" href="/#studio">
-        Make a little history <ArrowUpRight size={17} />
-      </Link>
+      <AccountMenu />
     </header>
   );
 }
@@ -27,7 +26,7 @@ export function Footer() {
         <Aperture size={22} />
         EditingApp.
       </Link>
-      <p>New memories. Old-school feeling.</p>
+      <p>A little imagination. A lot of you.</p>
       <div>
         <Link href="/guides">Guides</Link>
         <Link href="/about">About</Link>

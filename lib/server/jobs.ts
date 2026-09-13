@@ -4,12 +4,14 @@ import { admin } from "./supabase";
 import { AppError } from "@/lib/errors";
 import { ProviderError, editPortrait } from "./provider";
 import type { Preset, Quality } from "@/lib/presets";
+import type { ImagePreset, ImageFeature, FigurinePreset } from "@/lib/tools";
+import { runFeature } from "./ai/features";
 import { FEATURES } from "./ai/registry";
 export type Job = {
   id: string;
   user_id: string;
   fingerprint: string;
-  preset: Preset;
+  preset: ImagePreset;
   quality: Quality;
   status:
     | "reserved"
@@ -25,6 +27,7 @@ export type Job = {
   provider?: "openai" | "fal";
   provider_model?: string;
   feature_id?: string;
+  credits_charged?: number;
 };
 export const BUCKET = "portraits";
 export const pathFor = (
@@ -43,6 +46,8 @@ export function publicJob(job: Job) {
     id: job.id,
     status,
     preset: job.preset,
+    featureId: job.feature_id || "retro-portrait",
+    creditsCharged: job.credits_charged || 0,
     errorCode: job.error_code,
     expiresAt: job.expires_at,
   };
@@ -107,6 +112,57 @@ export async function reserveJob(input: {
   }
   return data as { fresh: boolean; job: Job };
 }
+export async function reserveCreditJob(input: {
+  id: string;
+  userId: string;
+  fingerprint: string;
+  preset: ImagePreset;
+  quality: Quality;
+  featureId: ImageFeature;
+}) {
+  const { data, error } = await admin().rpc("reserve_image_job", {
+    p_id: input.id,
+    p_user_id: input.userId,
+    p_fingerprint: input.fingerprint,
+    p_feature: input.featureId,
+    p_preset: input.preset,
+    p_quality: input.quality,
+  });
+  if (error) {
+    const mappings = [
+      [
+        "CREDITS",
+        "You do not have enough credits for this image. Choose a plan to add more.",
+        402,
+      ],
+      [
+        "BILLING_HOLD",
+        "Your billing account needs review before you can generate more images.",
+        403,
+      ],
+      [
+        "RATE_LIMIT",
+        "Generation is temporarily at its daily safety limit. Your credits have not been charged.",
+        429,
+      ],
+      ["BUSY", "Finish your current image before starting another.", 409],
+      [
+        "CONFLICT",
+        "This request ID already belongs to a different image or style.",
+        409,
+      ],
+      [
+        "FEATURE_DISABLED",
+        "This tool is temporarily unavailable. Your credits have not been charged.",
+        503,
+      ],
+    ] as const;
+    const matched = mappings.find(([code]) => error.message.includes(code));
+    if (matched) throw new AppError(matched[0], matched[1], matched[2]);
+    throw error;
+  }
+  return data as { fresh: boolean; job: Job };
+}
 async function updateJob(job: Job, values: Record<string, unknown>) {
   const { error } = await admin()
     .from("portrait_jobs")
@@ -128,11 +184,21 @@ export async function runJob(job: Job, photo: Buffer) {
     await updateJob(job, {
       status: "processing",
       provider: "fal",
-      provider_model: FEATURES["retro-portrait"].endpoint,
-      feature_id: "retro-portrait",
+      provider_model:
+        FEATURES[
+          job.feature_id === "ai-figurine" ? "ai-figurine" : "retro-portrait"
+        ].endpoint,
+      feature_id: job.feature_id || "retro-portrait",
     });
     dispatched = true;
-    const result = await editPortrait(photo, job.preset, job.quality);
+    const result =
+      job.feature_id === "ai-figurine"
+        ? await runFeature("ai-figurine", {
+            photo,
+            preset: job.preset as FigurinePreset,
+            quality: job.quality,
+          })
+        : await editPortrait(photo, job.preset as Preset, job.quality);
     // Fully decode to validate output; keep original PNG bytes and provenance.
     const output = sharp(result.bytes, {
       limitInputPixels: 8_000_000,
@@ -161,12 +227,21 @@ export async function runJob(job: Job, photo: Buffer) {
     const uncertain =
       error instanceof ProviderError ? error.uncertain : dispatched;
     // If saving the state fails, leave the reservation in place. It can never dispatch again.
-    await updateJob(job, {
+    const values = {
       status: uncertain ? "uncertain" : "failed",
       consumes_allowance: uncertain,
       error_code:
         error instanceof ProviderError ? error.reason : "PROCESSING_FAILED",
-    });
+    };
+    if (job.credits_charged) {
+      const settled = await admin().rpc("settle_image_failure", {
+        p_id: job.id,
+        p_user_id: job.user_id,
+        p_uncertain: uncertain,
+        p_error: values.error_code,
+      });
+      if (settled.error) throw settled.error;
+    } else await updateJob(job, values);
   }
   return getJob(job.id, job.user_id);
 }

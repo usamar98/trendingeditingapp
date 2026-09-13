@@ -4,6 +4,7 @@ import { AppError } from "@/lib/errors";
 const fake = vi.hoisted(() => ({
   user: vi.fn(),
   reserve: vi.fn(),
+  reserveCredits: vi.fn(),
   run: vi.fn(),
   get: vi.fn(),
   download: vi.fn(),
@@ -17,6 +18,7 @@ vi.mock("@/lib/server/jobs", async (original) => {
   return {
     ...real,
     reserveJob: fake.reserve,
+    reserveCreditJob: fake.reserveCredits,
     runJob: fake.run,
     getJob: fake.get,
   };
@@ -36,10 +38,16 @@ const job = {
 };
 beforeEach(() => {
   vi.stubEnv("APP_URL", "http://localhost:3001");
+  vi.stubEnv("FAL_KEY", "fixture-fal-key");
+  vi.stubEnv("SUPABASE_URL", "https://fixture.supabase.co");
+  vi.stubEnv("SUPABASE_ANON_KEY", "fixture-anon");
+  vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "fixture-service");
+  vi.stubEnv("CREDITS_ENABLED", "false");
   Object.values(fake).forEach((mock) => mock.mockReset());
   fake.user.mockResolvedValue({ id: "owner" });
   fake.get.mockResolvedValue(job);
   fake.reserve.mockResolvedValue({ fresh: true, job });
+  fake.reserveCredits.mockResolvedValue({ fresh: true, job });
   fake.run.mockResolvedValue(job);
   fake.download.mockResolvedValue({
     data: new Blob(["private image"]),
@@ -63,6 +71,44 @@ async function form(valid = true) {
   return data;
 }
 describe("HTTP route boundaries", () => {
+  it("reserves figurine credits only for reviewed inputs and never dispatches a replay", async () => {
+    vi.stubEnv("CREDITS_ENABLED", "true");
+    const send = async (feature = "ai-figurine", preset = "figurine-box") => {
+      const body = await form();
+      body.set("featureId", feature);
+      body.set("preset", preset);
+      body.set("endpoint", "attacker/model");
+      body.set("credits", "0");
+      return POST(
+        new Request("http://localhost:3001/api/portraits", {
+          method: "POST",
+          headers: { origin: "http://localhost:3001" },
+          body,
+        }),
+      );
+    };
+    expect((await send("attacker/model")).status).toBe(400);
+    expect((await send("ai-figurine", "studio")).status).toBe(400);
+    expect(fake.reserveCredits).not.toHaveBeenCalled();
+    expect((await send()).status).toBe(200);
+    expect(fake.reserveCredits).toHaveBeenCalledWith(
+      expect.objectContaining({
+        featureId: "ai-figurine",
+        preset: "figurine-box",
+        quality: "medium",
+        userId: "owner",
+      }),
+    );
+    expect(fake.reserve).not.toHaveBeenCalled();
+    fake.reserveCredits.mockResolvedValue({ fresh: false, job });
+    expect((await send()).status).toBe(200);
+    expect(fake.run).toHaveBeenCalledTimes(1);
+    fake.reserveCredits.mockRejectedValue(
+      new AppError("CREDITS", "Not enough credits", 402),
+    );
+    expect((await send()).status).toBe(402);
+    expect(fake.run).toHaveBeenCalledTimes(1);
+  });
   it("keeps cleanup locked when its optional secret is absent or incorrect", async () => {
     for (const secret of ["", "correct-cleanup-secret"]) {
       vi.stubEnv("CRON_SECRET", secret);

@@ -2,15 +2,16 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { appUrl } from "@/lib/server/config";
 import { pageMetadata } from "@/lib/seo";
+import { AccountProvider } from "@/components/account-provider";
 export const metadata: Metadata = {
   ...pageMetadata(
-    "AI Retro Portrait Generator — 1980s Photos",
-    "Turn your selfie into an 80s AI portrait. Choose studio, cinema or vintage album styling, compare your face, and download your portrait and before-and-after.",
+    "AI Photo Tools — Retro Portraits & Figurines",
+    "Create AI retro portraits and collectible figurine images from your photo. Explore the tools, compare your result and download your favorites.",
     "/",
   ),
   metadataBase: new URL(appUrl()),
   title: {
-    default: "AI Retro Portrait Generator — 1980s Photos | EditingApp",
+    default: "AI Photo Tools — Retro Portraits & Figurines | EditingApp",
     template: "%s | EditingApp",
   },
   verification: process.env.GOOGLE_SITE_VERIFICATION
@@ -31,7 +32,7 @@ export default function RootLayout({
         <a className="skip-link" href="#main">
           Skip to content
         </a>
-        {children}
+        <AccountProvider>{children}</AccountProvider>
       </body>
     </html>
   );

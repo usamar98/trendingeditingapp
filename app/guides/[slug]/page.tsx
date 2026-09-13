@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ...metadata.openGraph,
       type: "article",
       publishedTime: guide.published,
-      modifiedTime: guide.published,
+      modifiedTime: "2026-09-13",
       authors: [siteUrl("/about")],
     },
   };
@@ -47,7 +47,7 @@ export default async function GuidePage({ params }: Props) {
       description: guide.description,
       image: [siteUrl(guide.image)],
       datePublished: guide.published,
-      dateModified: guide.published,
+      dateModified: "2026-09-13",
       mainEntityOfPage: url,
       author: {
         "@type": "Organization",
@@ -95,7 +95,8 @@ export default async function GuidePage({ params }: Props) {
               <p className="guide-intro">{guide.intro}</p>
               <p className="guide-byline">
                 By <Link href="/about">EditingApp</Link> · Published{" "}
-                <time dateTime={guide.published}>September 12, 2026</time>
+                <time dateTime={guide.published}>September 12, 2026</time> ·
+                Updated <time dateTime="2026-09-13">September 13, 2026</time>
               </p>
             </div>
             <figure>
@@ -137,7 +138,10 @@ export default async function GuidePage({ params }: Props) {
                   Choose your retro style, preview your selfie and check your
                   allowance before you generate.
                 </p>
-                <Link href="/#studio" className="primary">
+                <Link
+                  href="/tools/ai-retro-portraits#studio"
+                  className="primary"
+                >
                   Create an AI retro portrait
                 </Link>
               </section>

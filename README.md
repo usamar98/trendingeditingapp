@@ -1,6 +1,8 @@
-# EditingApp — AI Retro Portrait Generator
+# EditingApp — AI Photo Tools
 
 Native **Next.js 16.3.5 + TypeScript**, Supabase Auth/Postgres/private Storage, and a real server-only **fal** image-edit integration using **GPT Image 2.5 Sunburst**. See [research and provider comparison](docs/RESEARCH.md) and [fal integration research](docs/FAL.md).
+
+The September 13 release adds an **AI Figurine Generator**, an expandable homepage tool catalog, header login/signup, private profile and credit history, and **Stripe** monthly/yearly subscriptions. Start with [billing and Supabase activation](docs/BILLING_SETUP.md) and [feature research](docs/FEATURE_RESEARCH_20260913.md). The existing production allowance remains available until `CREDITS_ENABLED=true` is configured after the migration. Real generation/payment verification needs credentials; the browser tests are simulated.
 
 ## What works
 
@@ -9,7 +11,7 @@ Native **Next.js 16.3.5 + TypeScript**, Supabase Auth/Postgres/private Storage, 
 - Email link or OTP sign-in with a server cookie session, three daily portrait allowances, a 50-attempt daily site cap, and bounded email-send attempts.
 - Private originals/results, generation states, reload recovery, comparison slider and side-by-side views.
 - Portrait download, browser-composed labeled before-and-after PNG, manual deletion and expiry cleanup.
-- Seven public pages with canonical metadata, sitemap, robots, Open Graph previews, WebSite/WebApplication and guide Article/breadcrumb structured data.
+- Ten public pages with canonical metadata, sitemap, robots, Open Graph previews, WebSite/WebApplication and guide Article/breadcrumb structured data. The private account page is excluded from indexing.
 - Original retro prompt and selfie guides, an About page, and an exportable [Search Console kit](docs/search-console/README.md) for updating the existing property after the feature change.
 
 **Live generation is not enabled in this checkout.** No fal/Supabase secrets were available. Demo images are labeled illustrations. Tests use fixtures and mocks explicitly; there is no production mock-mode switch.

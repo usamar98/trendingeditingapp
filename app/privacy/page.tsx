@@ -10,11 +10,12 @@ export default function Privacy() {
     <>
       <Header />
       <main id="main" className="legal">
-        <p className="eyebrow">LAST UPDATED SEPTEMBER 12, 2026</p>
+        <p className="eyebrow">LAST UPDATED SEPTEMBER 13, 2026</p>
         <h1>Your photos stay personal.</h1>
         <p>
-          EditingApp uses your photo to create the portrait you request. It does
-          not run a public gallery or train its own models on your photos.
+          EditingApp uses your photo to create the portrait or figurine image
+          you request. It does not run a public gallery or train its own models
+          on your photos.
         </p>
         <h2>Before you generate</h2>
         <p>
@@ -47,10 +48,10 @@ export default function Privacy() {
           Minimal request metadata supports duplicate-request protection and
           usage control. Cleanup removes expired records older than 30 days;
           without cleanup, they remain until the operator removes them. Deleting
-          photos does not restore spent allowance. Your authentication email
-          remains in Supabase until the operator deletes your account. The
-          operator must delete private storage objects before deleting an
-          authentication user.
+          photos does not restore spent credits or allowance. Your
+          authentication email remains in Supabase until the operator deletes
+          your account. The operator must delete private storage objects before
+          deleting an authentication user.
         </p>
         <h2>Provider processing and retention</h2>
         <p>
@@ -73,6 +74,29 @@ export default function Privacy() {
           .
         </p>
         <h2>Session cookies and your choices</h2>
+        <p>
+          Your verified email, optional display name and bio are stored in
+          Supabase. Profiles are private to your account. Credit grants, expiry,
+          deductions and refunds are recorded separately from photos so deleting
+          a photo cannot reset usage.
+        </p>
+        <h2>Payments and account records</h2>
+        <p>
+          Stripe hosts checkout and the billing portal. It receives your billing
+          email and payment details; EditingApp stores Stripe customer,
+          subscription and invoice identifiers, plan status, payment event
+          identifiers and credit activity. Card details are entered on Stripe
+          and are not stored by EditingApp. Your selfies are not sent to Stripe.
+          See <a href="https://stripe.com/privacy">Stripe’s privacy policy</a>{" "}
+          for its processing practices.
+        </p>
+        <p>
+          Billing and credit records do not follow the 24-hour photo expiry or
+          30-day request cleanup. They are retained for account service, payment
+          reconciliation and applicable recordkeeping obligations. Account
+          deletion requires the operator to reconcile subscriptions and retained
+          billing records before removing the authentication account.
+        </p>
         <p>
           Essential, HTTP-only cookies keep you signed in. EditingApp includes
           no advertising trackers. Signing out removes your session; removing a
