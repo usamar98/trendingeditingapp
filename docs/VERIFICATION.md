@@ -1,5 +1,17 @@
 # Verification record
 
+## September 13 — AI Photo to Video
+
+Implemented two reviewed fal Kling v3 Standard queue adapters, four movement choices, the separate private video job/storage workflow, shared image/video spending limits, 60/90-credit reservations, signed callbacks, leased recovery, original comparison, silent MP4 playback/download, private history and deletion. Existing portraits can be sent into the video studio without a second local upload. The homepage, pricing, metadata, sitemap and privacy/terms now include video. See `PHOTO_VIDEO_RESEARCH_20260913.md` and `VIDEO_SETUP.md`.
+
+Production build and TypeScript pass. **181 unit/integration tests across 16 suites** pass, including all four exact migrations in PGlite, duplicate reservation/refund protection, cross-user conflicts, private bucket/RPC access, real Ed25519 signature checks, untrusted CDN URL rejection, bounded MP4 container/sample timing, lost submissions, failed provider results, storage recovery and download ownership. The complete existing **40-test desktop/mobile browser suite** passed; after the final guest-sign-in refinement, all **12 video browser tests** passed (including four newly added cases across both viewports). CI runs the combined 44 cases. Axe found no WCAG A/AA violations in the tested studio/result and catalog/pricing states; screenshots were visually reviewed.
+
+Browser verification includes actual playback and byte-for-byte MP4 download of a synthetic moving test pattern, original comparison, reload recovery, insufficient credits, malformed uploads, motion reference submission, interrupted requests without another POST, guest upload preservation after sign-in, clearing private media on account changes, and deletion/expiry. A startup race discovered by the tests was fixed: upload stays disabled until the initial account lookup completes. Mobile submission scrolls to its preview/progress panel. The fictional public example is explicitly labeled a camera-motion illustration, not an API-generated clip.
+
+All provider, hosted database/storage and billing behavior in these automated tests is simulated at the network boundary. No local fal or Supabase credentials were available, so no real video was generated, no hosted migration was applied, and no live likeness, latency or billed-cost benchmark is claimed. The implementation does not add a mock mode to production. Activation requires the new SQL migration and existing credentials/credit flag. Immediate provider payload deletion needs admin scope on the existing fal key; otherwise the documented retention fallback applies. No new compulsory cron key or Stripe variables were introduced. The public sitemap now contains eleven URLs.
+
+The history below records previous releases and their then-current limitations; the current activation instructions are in `VIDEO_SETUP.md` and `BILLING_SETUP.md`.
+
 ## September 13 — simplified Stripe environment
 
 Removed all seven Stripe price/portal ID environment dependencies. The server now resolves reviewed products/prices by stable Stripe IDs and lookup keys, creates missing objects with idempotency keys, and resolves the billing portal configuration automatically. Webhooks retrieve canonical prices without creating catalog objects. Existing setup-script objects and archived tagged renewal prices remain recognizable; mismatched and archived prices cannot start new sales.

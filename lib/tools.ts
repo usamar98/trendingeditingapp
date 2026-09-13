@@ -1,4 +1,5 @@
 import { PRESETS } from "@/lib/presets";
+import { VIDEO_PRESETS } from "@/lib/video";
 
 export const FIGURINE_PRESETS = [
   {
@@ -22,6 +23,21 @@ export type ImageFeature = "retro-portrait" | "ai-figurine";
 
 /** Public catalog drives homepage cards, tool routes and discoverable links. No provider secrets. */
 export const TOOL_CATALOG = [
+  {
+    id: "photo-to-video",
+    slug: "ai-photo-to-video",
+    name: "AI Photo to Video",
+    category: "MAKE YOUR PHOTO MOVE",
+    badge: "NEW · VIDEO STUDIO",
+    description:
+      "A still photo. A little movement. Create a cinematic portrait, bring a memory to life or transfer a move from your own clip.",
+    image: "/images/cinema.webp",
+    alt: "Fictional cinematic portrait illustrating the photo-to-video starting frame; not a generated video",
+    title: "AI Photo to Video — Animate Your Photos",
+    meta: "Turn a photo into a short AI video with cinematic movement or your own motion reference. See credits upfront, preview privately and download your MP4 with EditingApp.",
+    headline: "Your photo. Its next scene.",
+    presets: VIDEO_PRESETS,
+  },
   {
     id: "retro-portrait",
     slug: "ai-retro-portraits",
@@ -57,7 +73,12 @@ export function findTool(slug: string) {
   return TOOL_CATALOG.find((tool) => tool.slug === slug);
 }
 export function toolForFeature(feature: ImageFeature) {
-  return TOOL_CATALOG.find((tool) => tool.id === feature)!;
+  return TOOL_CATALOG.find(
+    (
+      tool,
+    ): tool is Extract<(typeof TOOL_CATALOG)[number], { id: ImageFeature }> =>
+      tool.id === feature,
+  )!;
 }
 export function figurinePrompt(preset: FigurinePreset) {
   const scene =

@@ -13,6 +13,7 @@ import {
 } from "@/lib/plans";
 import { useAccount } from "./account-provider";
 import { readApi } from "@/lib/session-client";
+import { VIDEO_CREDITS } from "@/lib/video";
 export function PricingCards({ ready }: { ready: boolean }) {
   const [interval, setInterval] = useState<BillingInterval>("month");
   const [busy, setBusy] = useState<PlanId | null>(null);
@@ -111,7 +112,14 @@ export function PricingCards({ ready }: { ready: boolean }) {
               </p>
               <ul>
                 <li>
-                  <Check size={16} /> All available image tools
+                  <Check size={16} /> All available photo & video tools
+                </li>
+                <li>
+                  <Check size={16} /> Or up to{" "}
+                  {Math.floor(credits / VIDEO_CREDITS.animation).toLocaleString(
+                    "en-US",
+                  )}{" "}
+                  five-second videos per {interval}
                 </li>
                 <li>
                   <Check size={16} /> Up to{" "}
@@ -125,7 +133,7 @@ export function PricingCards({ ready }: { ready: boolean }) {
                   {IMAGE_CREDITS.high} credits
                 </li>
                 <li>
-                  <Check size={16} /> Private generation & PNG downloads
+                  <Check size={16} /> Private PNG & MP4 downloads
                 </li>
                 <li>
                   <Check size={16} /> Manage renewal in your account
@@ -153,11 +161,13 @@ export function PricingCards({ ready }: { ready: boolean }) {
         })}
       </div>
       <p className="pricing-footnote">
-        USD. Standard images use 3 credits; high-detail images use 8. Credits
-        expire at the end of the paid period and do not roll over. Yearly plans
-        issue a full year’s credits upfront. Plans renew automatically until
-        canceled. Confirmed failed requests restore credits to their original
-        expiry; uncertain requests keep them reserved.{" "}
+        USD. Standard images use 3 credits; high-detail images use 8.
+        Five-second videos use 60 credits; Copy a Motion uses 90. Image and
+        video examples are alternative uses of the same balance, not separate
+        allowances. Credits expire at the end of the paid period and do not roll
+        over. Yearly plans issue a full year’s credits upfront. Plans renew
+        automatically until canceled. Confirmed failed requests restore credits
+        to their original expiry; uncertain requests keep them reserved.{" "}
         <Link href="/terms">Read the terms</Link>.
       </p>
     </>

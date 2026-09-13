@@ -1,6 +1,6 @@
 # Adding a feature from fal
 
-The application separates model discovery, feature-specific mapping, shared HTTP transport, and authenticated job handling. Retro portraits and figurine images are registered. Figurines require the credit migration and `CREDITS_ENABLED=true`; see `BILLING_SETUP.md`.
+The application separates model discovery, feature-specific mapping, shared HTTP transport, and authenticated job handling. Retro portraits, figurine images, photo-to-video and motion control are registered. Paid features require the credit migration and `CREDITS_ENABLED=true`; see `BILLING_SETUP.md` and `VIDEO_SETUP.md`.
 
 ## 1. Find the supported API
 
@@ -45,7 +45,7 @@ Add credit/cost entries in `generation_prices` through a migration, update the p
 
 Inline input and `sync_mode` are documented for Sunburst, not universal fal capabilities. Models without inline output need a reviewed private file-access strategy, allowlisted output hosts, bounded downloads and prompt cleanup. The existing decoder intentionally rejects remote URLs. Do not weaken it globally to make an unrelated model work.
 
-For jobs that can exceed the current 180-second provider wait, implement fal's durable queue lifecycle with persisted request IDs, status/result retrieval and a worker before enabling the feature. Only safe status/result GETs may retry. An ambiguous submission must never be automatically replayed. The current direct portrait path cannot recover provider output after a connection loss unless EditingApp already saved it.
+For long-running media, follow the existing video implementation: `mode: "queue"` in the registry, a reviewed allowlist in `fal-queue.ts`, durable `video_jobs`, signed callbacks, owner-triggered status recovery, and leased output persistence in `video-jobs.ts`. `runFeature("photo-to-video", input, { webhookUrl })` submits once. Only safe status/result GETs may retry. An ambiguous submission must never be automatically replayed. Queue results need their own private delivery and retention policy; do not copy the direct portrait adapter's `X-Fal-Store-IO: 0` into a workflow that depends on later result retrieval. The direct portrait path still cannot recover provider output after a connection loss unless EditingApp already saved it.
 
 ## 4. Verify before activation
 

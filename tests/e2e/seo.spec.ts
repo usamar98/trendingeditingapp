@@ -6,6 +6,7 @@ const paths = [
   "/pricing",
   "/tools/ai-retro-portraits",
   "/tools/ai-figurine-generator",
+  "/tools/ai-photo-to-video",
   "/guides",
   "/guides/1980s-ai-photo-prompts",
   "/guides/better-ai-portrait-likeness",

@@ -2,6 +2,8 @@ import { timingSafeEqual } from "node:crypto";
 import { admin } from "@/lib/server/supabase";
 import { deletePhotos, type Job } from "@/lib/server/jobs";
 import { errorResponse } from "@/lib/errors";
+import { deleteVideo, type VideoJob } from "@/lib/server/video-jobs";
+import { creditsEnabled } from "@/lib/server/config";
 export const maxDuration = 300;
 export async function GET(request: Request) {
   const supplied = Buffer.from(request.headers.get("authorization") || "");
@@ -33,7 +35,28 @@ export async function GET(request: Request) {
       .eq("status", "expired")
       .lt("created_at", cutoff);
     if (purge.error) throw purge.error;
-    return Response.json({ deleted, morePossible: deleted === 100 });
+    let videosDeleted = 0;
+    if (creditsEnabled()) {
+      const videos = await admin()
+        .from("video_jobs")
+        .select("*")
+        .lt("expires_at", new Date().toISOString())
+        .eq("files_deleted", false)
+        .order("expires_at")
+        .limit(10);
+      // The table may not exist during staged migration rollout; other cleanup must continue.
+      if (videos.error && !["42P01", "PGRST205"].includes(videos.error.code))
+        throw videos.error;
+      for (const job of (videos.data || []) as VideoJob[]) {
+        await deleteVideo(job);
+        videosDeleted++;
+      }
+    }
+    return Response.json({
+      deleted,
+      videosDeleted,
+      morePossible: deleted === 100 || videosDeleted === 10,
+    });
   } catch (error) {
     return errorResponse(error);
   }

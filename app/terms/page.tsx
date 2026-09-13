@@ -29,12 +29,16 @@ export default function Terms() {
         <h2>Credits and availability</h2>
         <p>
           A standard image uses 3 credits and a high-detail image uses 8.
-          Confirmed failures restore credits with their original expiry date;
-          uncertain requests keep them reserved until resolved. Completed images
-          use credits even if you decide not to keep them. Accounts on the
-          earlier daily allowance system see that allowance in the studio.
-          Shared service limits apply to all accounts; plans do not promise
-          unlimited generation or a particular processing time.
+          Five-second photo animations use 60 credits. Copy a Motion uses 90
+          credits for a 3–5 second silent clip. A new portrait used as a
+          starting frame is charged separately. Video preview and download do
+          not use more credits. Confirmed failures restore credits with their
+          original expiry date; uncertain requests keep them reserved until
+          resolved. Completed images and videos use credits even if you decide
+          not to keep them. Accounts on the earlier daily allowance system see
+          that allowance in the studio. Shared service limits apply to all
+          accounts; plans do not promise unlimited generation or a particular
+          processing time.
         </p>
         <h2>Subscriptions and renewal</h2>
         <p>
@@ -71,6 +75,13 @@ export default function Terms() {
           likeness of your result.
         </p>
         <h2>Your content</h2>
+        <p>
+          Only upload motion references you have rights to use, with permission
+          from the people depicted. Animation is an invented performance; do not
+          present it as footage of a real event. Motion illustrations on the
+          studio page are labeled demonstrations of camera movement, not outputs
+          from live video generation.
+        </p>
         <p>
           You keep your rights in your input. EditingApp grants you any rights
           it holds in your generated portrait, to the extent permitted by law.

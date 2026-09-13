@@ -8,6 +8,7 @@ import { TOOL_CATALOG, findTool } from "@/lib/tools";
 import { breadcrumbs, jsonLd, pageMetadata } from "@/lib/seo";
 import { siteUrl } from "@/lib/site";
 import { GuideCards } from "@/components/guide-cards";
+import { VideoToolPage } from "@/components/video-tool-page";
 export function generateStaticParams() {
   return TOOL_CATALOG.map(({ slug }) => ({ slug }));
 }
@@ -21,6 +22,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ToolPage({ params }: Props) {
   const tool = findTool((await params).slug);
   if (!tool) notFound();
+  if (tool.id === "photo-to-video") return <VideoToolPage />;
   const figurine = tool.id === "ai-figurine";
   return (
     <>

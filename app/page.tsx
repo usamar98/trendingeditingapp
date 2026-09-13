@@ -16,14 +16,14 @@ import { siteUrl } from "@/lib/site";
 import { jsonLd, pageMetadata } from "@/lib/seo";
 import { billingConfigured } from "@/lib/server/stripe";
 export const metadata = pageMetadata(
-  "AI Photo Tools — Retro Portraits & Figurine Generator",
-  "Create a new version of your photo with EditingApp. Explore 80s AI retro portraits and collectible figurine images, review results and download your favorites.",
+  "AI Photo & Video Tools — Animate, Restyle & Create",
+  "Bring your photos to life with EditingApp. Create short AI videos, 80s retro portraits and collectible figurine images. Check credits, preview privately and download.",
   "/",
 );
 const FAQS = [
   [
     "What can I create with EditingApp?",
-    "Turn a reference photo into an AI retro portrait or an image of a collectible figurine. Each tool has its own styles and upload workspace. The figurine tool creates an image, not a physical toy or a 3D-printable file.",
+    "Animate a photo into a short AI video, create a retro portrait or imagine yourself as a collectible figurine. Each tool has its own workspace. Video downloads are MP4 files; figurines are flat images, not physical toys or 3D-printable files.",
   ],
   [
     "Will the result still look like me?",
@@ -31,7 +31,7 @@ const FAQS = [
   ],
   [
     "How do credits work?",
-    "A standard image uses 3 credits and high detail uses 8. Paid monthly plans add credits after each successful renewal; yearly plans issue twelve months of credits after the yearly payment. Credits expire at the end of their paid period. Your studio shows the current credits or allowance before submission.",
+    "A standard image uses 3 credits and high detail uses 8. A five-second photo animation uses 60 credits; Copy a Motion uses 90 for a 3–5 second clip. Monthly plans add credits after each paid renewal; yearly plans issue twelve months upfront. Credits expire at the end of the paid period. Your studio shows the cost before submission.",
   ],
   [
     "Which photo should I upload?",
@@ -59,7 +59,7 @@ export default function Home() {
       name: "EditingApp",
       url: siteUrl(),
       description:
-        "AI photo tools for retro portraits and collectible figurine images.",
+        "AI photo and video tools for photo animation, retro portraits and collectible figurine images.",
     },
     {
       "@context": "https://schema.org",
@@ -73,7 +73,7 @@ export default function Home() {
     {
       "@context": "https://schema.org",
       "@type": "ItemList",
-      name: "EditingApp AI photo tools",
+      name: "EditingApp AI photo and video tools",
       itemListElement: TOOL_CATALOG.map((tool, index) => ({
         "@type": "ListItem",
         position: index + 1,
@@ -96,13 +96,14 @@ export default function Home() {
               <Sparkles size={15} /> A LITTLE IMAGINATION. A LOT OF YOU.
             </p>
             <h1>
-              AI photo tools.
+              AI photo &amp; video tools.
               <br />
               <span>Your next alter ego.</span>
             </h1>
             <p>
-              A throwback portrait. A miniature you. Find a new way to see
-              yourself—with simple tools made for your next creative idea.
+              A photo that moves. A throwback portrait. A miniature you. Find a
+              new way to see yourself with simple tools for your next creative
+              idea.
             </p>
             <a href="#tools" className="primary">
               Find your next look <ArrowRight size={18} />
@@ -114,17 +115,17 @@ export default function Home() {
           </div>
           <figure className="hero-collectible">
             <Image
-              src="/images/figurine-desk.png"
-              alt="AI-created demonstration of a fictional woman as a miniature desk collectible"
+              src="/images/cinema.webp"
+              alt="Fictional AI-created cinematic portrait illustrating a photo-to-video starting frame"
               width={1024}
               height={1536}
               sizes="(max-width: 700px) 75vw, 380px"
               priority
             />
             <figcaption>
-              <span>THE MINI-ME EDITION</span>
-              <strong>A new kind of self-portrait.</strong>
-              <small>Fictional AI-created demonstration</small>
+              <span>INTRODUCING PHOTO TO VIDEO</span>
+              <strong>Your photo. Its next scene.</strong>
+              <small>Fictional still illustration · Not a video result</small>
             </figcaption>
           </figure>
         </section>
@@ -167,7 +168,11 @@ export default function Home() {
                   </h3>
                   <p>{tool.description}</p>
                   <div className="tool-card-bottom">
-                    <span>3 credits / standard image</span>
+                    <span>
+                      {tool.id === "photo-to-video"
+                        ? "From 60 credits / video"
+                        : "3 credits / standard image"}
+                    </span>
                     <Link href={`/tools/${tool.slug}`}>
                       Open studio <ArrowUpRight size={17} />
                     </Link>
@@ -217,8 +222,8 @@ export default function Home() {
               <span className="step-num">03 / SAVE YOUR FAVORITE</span>
               <h3>A keeper, on your terms.</h3>
               <p>
-                Download your image or a labeled before-and-after. You decide
-                what to share and what stays in your private studio.
+                Download your MP4, image or a labeled before-and-after. You
+                decide what to share and what stays in your private studio.
               </p>
             </article>
           </div>

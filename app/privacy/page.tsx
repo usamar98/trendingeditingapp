@@ -13,9 +13,9 @@ export default function Privacy() {
         <p className="eyebrow">LAST UPDATED SEPTEMBER 13, 2026</p>
         <h1>Your photos stay personal.</h1>
         <p>
-          EditingApp uses your photo to create the portrait or figurine image
-          you request. It does not run a public gallery or train its own models
-          on your photos.
+          EditingApp uses your photo to create the video, portrait or figurine
+          image you request. It does not run a public gallery or train its own
+          models on your photos.
         </p>
         <h2>Before you generate</h2>
         <p>
@@ -72,6 +72,38 @@ export default function Privacy() {
             OpenAI’s data controls
           </a>
           .
+        </p>
+        <h2>Photo-to-video processing</h2>
+        <p>
+          Video generation sends a short-lived signed link to your privately
+          stored photo through fal to Kling. Copy a Motion also sends a signed
+          link to your reference MP4. Reference clips are not re-encoded: they
+          may contain sound or embedded metadata, so export a clip without
+          sensitive metadata before uploading. We request silent output. The
+          photo itself is re-encoded to remove metadata.
+        </p>
+        <p>
+          Video jobs use fal’s persistent queue so you can recover a result
+          after closing the browser. Unlike inline image generation, queue
+          input/output JSON is retained for recovery. After saving the MP4
+          privately, EditingApp requests deletion of fal’s request payload and
+          output file. This deletion API requires an admin-scoped fal key. If
+          deletion is unavailable, fal’s default JSON retention is 30 days; the
+          signed input links expire after one hour. We request private access
+          and a 24-hour lifetime for fal CDN output files. These controls do not
+          erase upstream processing records or override the provider’s policies.
+        </p>
+        <p>
+          Your video downloads require the owning account and redirect to a
+          private-storage link valid for at most 60 seconds. Anyone you share
+          that temporary link with can use it until it expires. Access ends 24
+          hours after submission. Delete files removes EditingApp’s copies; an
+          in-flight or uncertain video can require up to a one-hour wait.
+          Scheduled cleanup removes expired files, supplemented by cleanup when
+          you revisit expired requests. Without either, inaccessible files
+          remain privately stored until an operator deletes them. Video job and
+          credit records remain for duplicate-charge protection and billing
+          reconciliation.
         </p>
         <h2>Session cookies and your choices</h2>
         <p>

@@ -53,9 +53,9 @@ test("catalog cards, annual prices and new pages are accessible (no paid request
   await session(page);
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    "AI photo tools.Your next alter ego.",
+    "AI photo & video tools.Your next alter ego.",
   );
-  await expect(page.locator(".tool-card")).toHaveCount(2);
+  await expect(page.locator(".tool-card")).toHaveCount(3);
   await accessible(page);
   await page.screenshot({
     path: `test-results/${info.project.name}-catalog-top.png`,

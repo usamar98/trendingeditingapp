@@ -230,6 +230,13 @@ export function AccountPanel() {
                 {account.credits.toLocaleString("en-US")} <span>credits</span>
               </h2>
               <p>Standard image: 3 credits · High detail: 8 credits</p>
+              <p>Photo animation: 60 credits · Copy a Motion: 90 credits</p>
+              <Link
+                className="text-button"
+                href="/tools/ai-photo-to-video#video-studio"
+              >
+                Open your video studio &amp; history →
+              </Link>
               <button
                 className="text-button"
                 disabled={busy}

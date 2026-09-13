@@ -3,6 +3,7 @@
 /* eslint-disable @next/next/no-img-element */
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import {
   ArrowRight,
   Check,
@@ -836,6 +837,12 @@ export default function Studio({
                 </button>
               </div>
               <p className="expiry-note">
+                <Link
+                  className="animate-photo-link"
+                  href={`/tools/ai-photo-to-video?source=${result.id}`}
+                >
+                  Animate this photo → From 60 credits
+                </Link>
                 Available for 24 hours from submission. Downloads stay on your
                 device.
               </p>

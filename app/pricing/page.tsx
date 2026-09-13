@@ -4,8 +4,8 @@ import { PricingCards } from "@/components/pricing-cards";
 import { billingConfigured } from "@/lib/server/stripe";
 import { pageMetadata, breadcrumbs, jsonLd } from "@/lib/seo";
 export const metadata = pageMetadata(
-  "Plans & Credits for AI Photo Tools",
-  "Choose EditingApp Starter, Creator or Studio plans from $19 monthly. Compare monthly and yearly credits for AI retro portraits and collectible figurine images.",
+  "Plans & Credits for AI Photo and Video Tools",
+  "Choose EditingApp plans from $19 monthly. Compare monthly and yearly credits for AI photo-to-video, retro portraits and collectible figurines, with clear generation costs.",
   "/pricing",
 );
 export default function PricingPage() {
@@ -34,7 +34,8 @@ export default function PricingPage() {
           <h1>Make something worth keeping.</h1>
           <p>
             Choose the room you need to create. A standard image costs 3 credits
-            and high detail costs 8, across both retro portraits and figurines.
+            and high detail costs 8. Animate a photo for 60 credits or copy your
+            own motion clip for 90. Use one balance across all available tools.
           </p>
         </div>
         <PricingCards ready={billingConfigured()} />
@@ -54,8 +55,8 @@ export default function PricingPage() {
             <p>
               A confirmed failure restores the credits to their original credit
               balance and expiry date. A request with an uncertain outcome keeps
-              credits reserved while it is checked. A completed image uses
-              credits even if you decide not to keep it.
+              credits reserved while it is checked. A completed image or video
+              uses credits even if you decide not to keep it.
             </p>
           </details>
           <details>
@@ -73,9 +74,9 @@ export default function PricingPage() {
             <p>
               When credit accounts are enabled, a verified account receives 9
               one-time welcome credits, valid for 30 days. That covers three
-              standard images. If the site is still using its earlier allowance
-              system, the retro studio displays the available daily allowance
-              instead. No card is required to sign up.
+              standard images; it does not cover a video. If the site is still
+              using its earlier allowance system, the retro studio displays the
+              available daily allowance instead. No card is required to sign up.
             </p>
           </details>
         </section>

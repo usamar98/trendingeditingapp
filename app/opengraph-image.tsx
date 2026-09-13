@@ -1,5 +1,6 @@
 import { ImageResponse } from "next/og";
-export const alt = "EditingApp — AI Photo Tools. Retro Portraits & Figurines.";
+export const alt =
+  "EditingApp — AI Photo & Video Tools. Animate, restyle and create.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 export default function OpenGraphImage() {
@@ -34,7 +35,7 @@ export default function OpenGraphImage() {
         <span>A new possibility.</span>
       </div>
       <div style={{ display: "flex", fontSize: 26 }}>
-        AI PHOTO TOOLS / RETRO PORTRAITS · COLLECTIBLE FIGURINES
+        PHOTO TO VIDEO · RETRO PORTRAITS · FIGURINES
       </div>
     </div>,
     size,
