@@ -236,6 +236,9 @@ describe("video reconciliation with simulated provider/storage boundaries", () =
   });
   it.each([
     new ProviderReadError("VIDEO_CDN_AUTH_UNAVAILABLE", 403),
+    new ProviderReadError("VIDEO_ACCESS_DENIED", 403),
+    new ProviderReadError("VIDEO_SIGNING_UNAVAILABLE", 503),
+    new ProviderReadError("VIDEO_SIGNED_URL_INVALID"),
     new ProviderReadError("VIDEO_OUTPUT_URL_UNSUPPORTED"),
   ])(
     "retains provider output and credits when private delivery is blocked: $reason",

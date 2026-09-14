@@ -80,6 +80,12 @@ export function videoRecoveryMessage(code: string | null) {
       detail:
         "The generation request has finished processing. We’re retrieving and saving its result to your private library. No extra credits are charged.",
     };
+  if (code === "VIDEO_ACCESS_DENIED")
+    return {
+      title: "Your video needs an access fix.",
+      detail:
+        "The video provider denied access to this result. Your request is saved and its credits remain reserved. Contact support with the request details below to restore access or review the reservation. Checking this request again does not charge more credits.",
+    };
   return {
     title: "Your video needs another status check.",
     detail:

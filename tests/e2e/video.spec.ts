@@ -219,7 +219,7 @@ test("simulated lost submission response recovers with GET only", async ({
   expect(posts).toBe(1);
 });
 
-test("simulated saved request recovers after a delivery failure without another charge", async ({
+test("simulated saved request recovers after access is restored without another charge", async ({
   page,
 }, info) => {
   await page.clock.install();
@@ -248,7 +248,7 @@ test("simulated saved request recovers after a delivery failure without another 
     ...result,
     preset: "memory",
     status: "queued",
-    errorCode: "VIDEO_CDN_AUTH_UNAVAILABLE",
+    errorCode: "VIDEO_ACCESS_DENIED",
   };
   await page.route("**/api/videos", (r) => {
     if (r.request().method() === "POST") posts++;
@@ -269,11 +269,11 @@ test("simulated saved request recovers after a delivery failure without another 
   releaseSession();
   await expect(
     page.getByRole("heading", {
-      name: "Your video needs another status check.",
+      name: "Your video needs an access fix.",
     }),
   ).toBeVisible();
   await expect(
-    page.getByText(/Your credits remain reserved while we recover/),
+    page.getByText(/The video provider denied access to this result/),
   ).toBeVisible();
   await page.getByText("Request details", { exact: true }).click();
   await expect(
@@ -281,7 +281,7 @@ test("simulated saved request recovers after a delivery failure without another 
   ).toContainText(id);
   await expect(
     page.locator("details").filter({ hasText: "Request ID:" }),
-  ).toContainText("VIDEO_CDN_AUTH_UNAVAILABLE");
+  ).toContainText("VIDEO_ACCESS_DENIED");
   await upload(page);
   await page.getByRole("radio", { name: /Golden Breeze/ }).check();
   await expect(
@@ -308,7 +308,7 @@ test("simulated saved request recovers after a delivery failure without another 
   await page.reload();
   await expect(
     page.getByRole("heading", {
-      name: "Your video needs another status check.",
+      name: "Your video needs an access fix.",
     }),
   ).toBeVisible();
   recovered = true;
