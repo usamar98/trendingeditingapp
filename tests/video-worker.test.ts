@@ -236,6 +236,7 @@ describe("video reconciliation with simulated provider/storage boundaries", () =
   });
   it.each([
     new ProviderReadError("VIDEO_CDN_AUTH_UNAVAILABLE", 403),
+    new ProviderReadError("VIDEO_ASSET_AUTH_UNAVAILABLE", 403),
     new ProviderReadError("VIDEO_ACCESS_DENIED", 403),
     new ProviderReadError("VIDEO_SIGNING_UNAVAILABLE", 503),
     new ProviderReadError("VIDEO_SIGNED_URL_INVALID"),

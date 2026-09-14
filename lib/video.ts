@@ -80,7 +80,7 @@ export function videoRecoveryMessage(code: string | null) {
       detail:
         "The generation request has finished processing. We’re retrieving and saving its result to your private library. No extra credits are charged.",
     };
-  if (code === "VIDEO_ACCESS_DENIED")
+  if (code === "VIDEO_ACCESS_DENIED" || code === "VIDEO_ASSET_AUTH_UNAVAILABLE")
     return {
       title: "Your video needs an access fix.",
       detail:

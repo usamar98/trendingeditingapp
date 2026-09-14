@@ -157,57 +157,23 @@ export function videoOutputUrl(data: unknown): string {
     throw new ProviderReadError("VIDEO_OUTPUT_URL_UNSUPPORTED");
   return url.href;
 }
-async function cdnToken() {
-  try {
-    return await requestCdnToken();
-  } catch (error) {
-    if (error instanceof ProviderReadError) throw error;
-    throw new ProviderReadError("VIDEO_CDN_AUTH_UNAVAILABLE");
-  }
-}
-async function requestCdnToken() {
-  const response = await fetch(
-    "https://rest.fal.ai/storage/auth/token?storage_type=fal-cdn-v3",
-    {
-      method: "POST",
-      headers: authHeaders(),
-      body: JSON.stringify({ expiration_seconds: 300 }),
-      cache: "no-store",
-      redirect: "error",
-      signal: AbortSignal.timeout(10_000),
-    },
-  );
-  if (!response.ok) {
-    await response.body?.cancel();
-    throw new ProviderReadError("VIDEO_CDN_AUTH_UNAVAILABLE", response.status);
-  }
-  const { token } = await providerJson(response);
-  if (
-    typeof token !== "string" ||
-    !token ||
-    token.length > 16000 ||
-    /[\r\n]/.test(token)
-  )
-    throw new ProviderReadError("VIDEO_CDN_AUTH_UNAVAILABLE");
-  return token;
-}
-
-async function signedVideoUrl(url: string, token: string) {
-  // fal's documented alternative for restricted files. This only creates a
-  // five-minute read credential for the same output; it never changes its ACL.
+async function signedVideoUrl(url: string) {
+  // Platform Storage signing authenticates the API key with assets:read.
+  // Unlike a CDN identity token, its signature grants access to restricted
+  // output regardless of its ACL. The file remains private, with no ACL write.
   let response: Response;
   try {
-    response = await fetch(`${url}/sign`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
+    response = await fetch(
+      `https://api.fal.ai/v1/storage/files/sign?url=${encodeURIComponent(url)}`,
+      {
+        method: "POST",
+        headers: authHeaders(),
+        body: JSON.stringify({ expiration_seconds: 300 }),
+        cache: "no-store",
+        redirect: "error",
+        signal: AbortSignal.timeout(10_000),
       },
-      body: JSON.stringify({ duration: 300, scope: ["read"] }),
-      cache: "no-store",
-      redirect: "error",
-      signal: AbortSignal.timeout(10_000),
-    });
+    );
   } catch {
     throw new ProviderReadError("VIDEO_SIGNING_UNAVAILABLE");
   }
@@ -215,21 +181,26 @@ async function signedVideoUrl(url: string, token: string) {
     await response.body?.cancel();
     throw new ProviderReadError(
       [401, 403].includes(response.status)
-        ? "VIDEO_ACCESS_DENIED"
+        ? "VIDEO_ASSET_AUTH_UNAVAILABLE"
         : "VIDEO_SIGNING_UNAVAILABLE",
       response.status,
     );
   }
   try {
-    const value = (await boundedBytes(response, 32_768))
-      .toString("utf8")
-      .trim();
+    const { signed_url: value } = JSON.parse(
+      (await boundedBytes(response, 32_768)).toString("utf8"),
+    );
+    if (typeof value !== "string" || value.length > 16_000)
+      throw new Error("Invalid signed URL");
     const signed = new URL(value);
     const original = new URL(url);
     // The signed URL is a credential. Keep it server-only and constrain its
-    // destination to exactly the already reviewed file, with one identity field.
+    // destination to the same file on the reviewed fal v3 hosts. The Platform
+    // schema also documents the v3 alias. Never accept a third-party destination.
     if (
-      signed.origin !== original.origin ||
+      signed.protocol !== "https:" ||
+      !["v3b.fal.media", "v3.fal.media"].includes(signed.hostname) ||
+      signed.port ||
       signed.pathname !== original.pathname ||
       signed.username ||
       signed.password ||
@@ -247,24 +218,14 @@ async function signedVideoUrl(url: string, token: string) {
 
 export async function downloadFalVideo(data: unknown) {
   const url = videoOutputUrl(data);
-  const token = await cdnToken();
-  let file = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
+  const signedUrl = await signedVideoUrl(url);
+  // Only retrieve the existing result; no API key is sent to the CDN and no
+  // inference request is submitted or retried, even if the download fails.
+  const file = await fetch(signedUrl, {
     cache: "no-store",
     redirect: "error",
     signal: AbortSignal.timeout(45_000),
   });
-  if (file.status === 403) {
-    await file.body?.cancel();
-    const signedUrl = await signedVideoUrl(url, token);
-    // A single alternate download, never an inference retry. No bearer token or
-    // API key is forwarded with this URL, and redirects remain prohibited.
-    file = await fetch(signedUrl, {
-      cache: "no-store",
-      redirect: "error",
-      signal: AbortSignal.timeout(45_000),
-    });
-  }
   if (!file.ok) {
     await file.body?.cancel();
     throw new ProviderReadError(

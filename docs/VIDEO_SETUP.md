@@ -16,7 +16,7 @@ Fresh installations apply all four numbered migrations in filename order. Existi
 
 **No new environment-variable names are required.** Reuse these existing server-only values:
 
-- `FAL_KEY`: needs credits and access to `fal-ai/kling-video/v3/standard/image-to-video` and `fal-ai/kling-video/v3/standard/motion-control`. The same key needs **admin scope** for the payload-deletion API. With an inference-only key, generation can work but immediate provider cleanup cannot be confirmed; the privacy notice explains fallback retention. Do not put a key in chat or `NEXT_PUBLIC_*`.
+- `FAL_KEY`: needs credits and access to `fal-ai/kling-video/v3/standard/image-to-video` and `fal-ai/kling-video/v3/standard/motion-control`, plus **`assets:read` permission** for the [Platform Storage signing API](https://fal.ai/docs/platform-apis/v1/storage/files/sign). Generating a video and reading its private output are separate capabilities. The same key needs **admin scope** for the payload-deletion API. With an inference-only key, private delivery or immediate provider cleanup can be denied. Do not put a key in chat or `NEXT_PUBLIC_*`.
 - `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`: the same project used by existing accounts.
 - `CREDITS_ENABLED=true`: set after the credits migration. Videos do not use the old daily free-image allowance.
 - `APP_URL=https://www.editingapp.live`: the exact canonical public origin. Rebuild after a change. A publicly reachable origin is needed for callback recovery when the browser closes.

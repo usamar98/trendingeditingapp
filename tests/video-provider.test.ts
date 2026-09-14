@@ -191,25 +191,46 @@ describe("reviewed video adapters and private delivery", () => {
   ])("rejects unreviewed media URL %s", (url) =>
     expect(() => videoOutputUrl({ video: { url } })).toThrow(),
   );
-  it("exchanges the fal key for a short-lived CDN token without exposing the key", async () => {
-    fetcher
-      .mockResolvedValueOnce(Response.json({ token: "short-lived-token" }))
-      .mockResolvedValueOnce(new Response("mp4-bytes"));
-    expect((await downloadFalVideo({ video: { url: cdn } })).toString()).toBe(
-      "mp4-bytes",
-    );
-    expect(fetcher.mock.calls[0][0]).toBe(
-      "https://rest.fal.ai/storage/auth/token?storage_type=fal-cdn-v3",
-    );
-    expect(fetcher.mock.calls[1]).toEqual([
-      cdn,
-      expect.objectContaining({
-        headers: { Authorization: "Bearer short-lived-token" },
-        redirect: "error",
-      }),
-    ]);
-  });
-  it("identifies CDN authentication failures without forwarding secrets or fetching the file", async () => {
+  it.each(["v3b.fal.media", "v3.fal.media"])(
+    "uses Platform Storage signing to retrieve private output from %s",
+    async (host) => {
+      const signed = `${cdn.replace("v3b.fal.media", host)}?identity=private-read-credential`;
+      fetcher
+        .mockResolvedValueOnce(Response.json({ signed_url: signed }))
+        .mockResolvedValueOnce(new Response("mp4-bytes"));
+      expect((await downloadFalVideo({ video: { url: cdn } })).toString()).toBe(
+        "mp4-bytes",
+      );
+      expect(fetcher.mock.calls[0]).toEqual([
+        `https://api.fal.ai/v1/storage/files/sign?url=${encodeURIComponent(cdn)}`,
+        expect.objectContaining({
+          method: "POST",
+          headers: {
+            Authorization: "Key test-key",
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ expiration_seconds: 300 }),
+          redirect: "error",
+        }),
+      ]);
+      expect(fetcher.mock.calls[1]).toEqual([
+        signed,
+        expect.objectContaining({
+          redirect: "error",
+          cache: "no-store",
+        }),
+      ]);
+      expect(fetcher.mock.calls[1][1].headers).toBeUndefined();
+      expect(fetcher).toHaveBeenCalledTimes(2);
+      expect(
+        fetcher.mock.calls.some(
+          ([url]) =>
+            url.includes("queue.fal.run") || url.includes("storage/auth/token"),
+        ),
+      ).toBe(false);
+    },
+  );
+  it("identifies a denied assets:read operation without fetching the file or disclosing the error body", async () => {
     fetcher.mockResolvedValue(
       Response.json(
         { detail: "private provider information" },
@@ -219,49 +240,16 @@ describe("reviewed video adapters and private delivery", () => {
     await expect(
       downloadFalVideo({ video: { url: cdn } }),
     ).rejects.toMatchObject({
-      reason: "VIDEO_CDN_AUTH_UNAVAILABLE",
+      reason: "VIDEO_ASSET_AUTH_UNAVAILABLE",
       httpStatus: 403,
       definitive: false,
     });
     expect(fetcher).toHaveBeenCalledTimes(1);
   });
-  it("recovers a direct CDN 403 with a private signed download of the same file", async () => {
-    const signed = `${cdn}?identity=private-read-credential`;
-    const forbidden = new Response("forbidden", { status: 403 });
-    fetcher
-      .mockResolvedValueOnce(Response.json({ token: "short-lived-token" }))
-      .mockResolvedValueOnce(forbidden)
-      .mockResolvedValueOnce(new Response(signed))
-      .mockResolvedValueOnce(new Response("recovered-mp4"));
-    expect((await downloadFalVideo({ video: { url: cdn } })).toString()).toBe(
-      "recovered-mp4",
-    );
-    expect(forbidden.bodyUsed).toBe(true);
-    expect(fetcher).toHaveBeenCalledTimes(4);
-    expect(fetcher.mock.calls[2]).toEqual([
-      `${cdn}/sign`,
-      expect.objectContaining({
-        method: "POST",
-        headers: {
-          Authorization: "Bearer short-lived-token",
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ duration: 300, scope: ["read"] }),
-        redirect: "error",
-      }),
-    ]);
-    expect(fetcher.mock.calls[3]).toEqual([
-      signed,
-      expect.objectContaining({ redirect: "error", cache: "no-store" }),
-    ]);
-    expect(fetcher.mock.calls[3][1].headers).toBeUndefined();
-    expect(fetcher.mock.calls[3][1].method).toBeUndefined();
-    expect(
-      fetcher.mock.calls.some(([url]) => url.includes("queue.fal.run")),
-    ).toBe(false);
-  });
   it.each([
     "https://evil.test/video.mp4?identity=secret",
+    "https://v3.fal.media.evil.test/files/b/koala/test-video.mp4?identity=secret",
+    "https://v3b.fal.media:444/files/b/koala/test-video.mp4?identity=secret",
     "http://v3b.fal.media/files/b/koala/test-video.mp4?identity=secret",
     cdn.replace("test-video.mp4", "different.mp4") + "?identity=secret",
     cdn.replace("v3b.fal.media", "user:pass@v3b.fal.media") +
@@ -275,46 +263,50 @@ describe("reviewed video adapters and private delivery", () => {
   ])(
     "rejects an unsafe signing response without requesting it: %s",
     async (signed) => {
-      fetcher
-        .mockResolvedValueOnce(Response.json({ token: "short-lived-token" }))
-        .mockResolvedValueOnce(new Response(null, { status: 403 }))
-        .mockResolvedValueOnce(new Response(signed));
+      fetcher.mockResolvedValueOnce(Response.json({ signed_url: signed }));
       await expect(
         downloadFalVideo({ video: { url: cdn } }),
       ).rejects.toMatchObject({
         reason: "VIDEO_SIGNED_URL_INVALID",
         definitive: false,
       });
-      expect(fetcher).toHaveBeenCalledTimes(3);
+      expect(fetcher).toHaveBeenCalledTimes(1);
     },
   );
   it.each(["sign", "download"])(
     "keeps a %s access denial unresolved without looping or leaking provider details",
     async (step) => {
-      fetcher
-        .mockResolvedValueOnce(Response.json({ token: "short-lived-token" }))
-        .mockResolvedValueOnce(new Response(null, { status: 403 }));
       if (step === "download")
-        fetcher.mockResolvedValueOnce(new Response(`${cdn}?identity=secret`));
+        fetcher.mockResolvedValueOnce(
+          Response.json({ signed_url: `${cdn}?identity=secret` }),
+        );
       fetcher.mockResolvedValueOnce(
         new Response("private provider body", { status: 403 }),
       );
       await expect(
         downloadFalVideo({ video: { url: cdn } }),
       ).rejects.toMatchObject({
-        message: "VIDEO_ACCESS_DENIED",
-        reason: "VIDEO_ACCESS_DENIED",
+        message:
+          step === "sign"
+            ? "VIDEO_ASSET_AUTH_UNAVAILABLE"
+            : "VIDEO_ACCESS_DENIED",
+        reason:
+          step === "sign"
+            ? "VIDEO_ASSET_AUTH_UNAVAILABLE"
+            : "VIDEO_ACCESS_DENIED",
         httpStatus: 403,
         definitive: false,
       });
-      expect(fetcher).toHaveBeenCalledTimes(step === "sign" ? 3 : 4);
+      expect(fetcher).toHaveBeenCalledTimes(step === "sign" ? 1 : 2);
     },
   );
   it.each([404, 429, 500])(
-    "does not sign or replay a download on HTTP %s",
+    "does not replay a signed download on HTTP %s",
     async (status) => {
       fetcher
-        .mockResolvedValueOnce(Response.json({ token: "short-lived-token" }))
+        .mockResolvedValueOnce(
+          Response.json({ signed_url: `${cdn}?identity=secret` }),
+        )
         .mockResolvedValueOnce(new Response(null, { status }));
       await expect(
         downloadFalVideo({ video: { url: cdn } }),
@@ -328,30 +320,81 @@ describe("reviewed video adapters and private delivery", () => {
   );
   it("preserves the size bound on a signed video download", async () => {
     fetcher
-      .mockResolvedValueOnce(Response.json({ token: "short-lived-token" }))
-      .mockResolvedValueOnce(new Response(null, { status: 403 }))
-      .mockResolvedValueOnce(new Response(`${cdn}?identity=secret`))
+      .mockResolvedValueOnce(
+        Response.json({ signed_url: `${cdn}?identity=secret` }),
+      )
       .mockResolvedValueOnce(
         new Response("bytes", { headers: { "content-length": "50000001" } }),
       );
     await expect(downloadFalVideo({ video: { url: cdn } })).rejects.toThrow(
       "Invalid response size",
     );
-    expect(fetcher).toHaveBeenCalledTimes(4);
+    expect(fetcher).toHaveBeenCalledTimes(2);
   });
-  it.each([null, {}, { token: 12 }, { token: "invalid\r\ntoken" }])(
-    "classifies malformed CDN credentials without attempting a download: %j",
+  it.each([
+    null,
+    {},
+    { signed_url: 12 },
+    { signed_url: `${cdn}?identity=invalid\r\ntoken` },
+  ])(
+    "rejects malformed Platform signing results without attempting a download: %j",
     async (body) => {
       fetcher.mockResolvedValueOnce(Response.json(body));
       await expect(
         downloadFalVideo({ video: { url: cdn } }),
       ).rejects.toMatchObject({
-        reason: "VIDEO_CDN_AUTH_UNAVAILABLE",
+        reason: "VIDEO_SIGNED_URL_INVALID",
         definitive: false,
       });
       expect(fetcher).toHaveBeenCalledTimes(1);
     },
   );
+  it.each([401, 403, 404, 429, 500])(
+    "keeps Platform signing HTTP %s nonterminal without extra requests",
+    async (status) => {
+      fetcher.mockResolvedValueOnce(
+        Response.json(
+          {
+            error: {
+              type: "authorization_error",
+              message: "private provider data",
+            },
+          },
+          { status },
+        ),
+      );
+      await expect(
+        downloadFalVideo({ video: { url: cdn } }),
+      ).rejects.toMatchObject({
+        reason: [401, 403].includes(status)
+          ? "VIDEO_ASSET_AUTH_UNAVAILABLE"
+          : "VIDEO_SIGNING_UNAVAILABLE",
+        httpStatus: status,
+        definitive: false,
+      });
+      expect(fetcher).toHaveBeenCalledTimes(1);
+    },
+  );
+  it("bounds malformed signing JSON and classifies a signing timeout", async () => {
+    fetcher.mockResolvedValueOnce(new Response("invalid JSON"));
+    await expect(
+      downloadFalVideo({ video: { url: cdn } }),
+    ).rejects.toMatchObject({ reason: "VIDEO_SIGNED_URL_INVALID" });
+    fetcher.mockResolvedValueOnce(new Response("x".repeat(32_769)));
+    await expect(
+      downloadFalVideo({ video: { url: cdn } }),
+    ).rejects.toMatchObject({ reason: "VIDEO_SIGNED_URL_INVALID" });
+    fetcher.mockRejectedValueOnce(
+      new DOMException("private transport details", "TimeoutError"),
+    );
+    await expect(
+      downloadFalVideo({ video: { url: cdn } }),
+    ).rejects.toMatchObject({
+      message: "VIDEO_SIGNING_UNAVAILABLE",
+      definitive: false,
+    });
+    expect(fetcher).toHaveBeenCalledTimes(3);
+  });
   it("bounds chunked provider media and deletes payload only on confirmed cleanup", async () => {
     await expect(boundedBytes(new Response("123456"), 5)).rejects.toThrow();
     fetcher
