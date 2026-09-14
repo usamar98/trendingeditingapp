@@ -5,6 +5,14 @@ Users should reopen **AI Photo to Video**, select their existing request in
 retrieves the existing fal request; it never submits another generation.
 **Request details** shows the full EditingApp ID, movement, status and support code.
 
+Photo and movement selection remain available as a local draft while a request is
+pending. Selecting a draft does not change the existing request, upload files or
+charge credits. Generating stays blocked until the selected request is resolved.
+Persistent recovery errors pause automatic checks and show their support code
+above the check button. A status check stops waiting after 45 seconds; the server
+can still finish saving that same video. Switching requests cancels the old tab
+check and prevents its delayed response from replacing the newly selected job.
+
 Credits are reserved before submission. A confirmed failure uses
 `settle_video_failure` to restore the original allocation once. An unknown outcome
 or failed download keeps that reservation while the existing video is recovered.

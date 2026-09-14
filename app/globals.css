@@ -318,6 +318,19 @@
   line-height: 1.6;
   border-radius: 7px;
 }
+.video-draft-note {
+  margin: 0 0 24px;
+  padding: 12px 15px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #eff2e9;
+  color: var(--green);
+  font-size: 12px;
+  line-height: 1.7;
+}
+.video-waiting code {
+  overflow-wrap: anywhere;
+}
 .video-preview-panel {
   min-width: 0;
   padding: 28px;

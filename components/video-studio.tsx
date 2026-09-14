@@ -65,6 +65,7 @@ function VideoWorkspace() {
   const [available, setAvailable] = useState<boolean | null>(null),
     [busy, setBusy] = useState(false),
     [checking, setChecking] = useState(false),
+    [checkError, setCheckError] = useState(""),
     [error, setError] = useState("");
   const [showOriginal, setShowOriginal] = useState(false),
     [illustrate, setIllustrate] = useState(false),
@@ -73,12 +74,14 @@ function VideoWorkspace() {
     viewVersion = useRef(0),
     blobUrl = useRef(""),
     owner = useRef<string | undefined>(undefined);
+  const statusRequest = useRef<AbortController | null>(null);
   const email = session?.user?.email;
   const accountReady = session !== null;
   const previewPanel = useRef<HTMLDivElement>(null);
   const cost = videoCredits(preset);
   const style = videoPreset(preset)!;
-  const locked = !session || busy || active(job);
+  // Editing a local draft does not mutate or resubmit an existing video job.
+  const locked = !session || busy;
   const recovery = active(job) ? videoRecoveryMessage(job!.errorCode) : null;
   const mediaVersion = useRef(0);
   const [mediaKey, setMediaKey] = useState(0);
@@ -101,30 +104,80 @@ function VideoWorkspace() {
     }
     return data as { available: boolean; jobs: VideoJobView[] };
   }, []);
+  const cancelCheck = useCallback(() => {
+    statusRequest.current?.abort();
+    statusRequest.current = null;
+    setChecking(false);
+    setCheckError("");
+  }, []);
   const check = useCallback(
     async (id: string) => {
+      if (statusRequest.current) return;
       const version = viewVersion.current;
+      const controller = new AbortController();
+      statusRequest.current = controller;
+      // Aborting this GET only stops waiting in this tab. The leased server
+      // worker may still save the same result; no inference POST is replayed.
+      const timeout = setTimeout(() => controller.abort(), 45_000);
       setChecking(true);
+      setCheckError("");
       try {
         const next = (await readApi(
-          await fetch(`/api/videos/${id}`, { cache: "no-store" }),
+          await fetch(`/api/videos/${id}`, {
+            cache: "no-store",
+            signal: controller.signal,
+          }),
         )) as VideoJobView;
-        if (version !== viewVersion.current) return;
+        if (controller.signal.aborted)
+          throw new Error("Status check timed out");
+        if (
+          !next ||
+          next.id !== id ||
+          ![
+            "reserved",
+            "submitting",
+            "queued",
+            "processing",
+            "uncertain",
+            "succeeded",
+            "failed",
+            "expired",
+          ].includes(next.status)
+        )
+          throw new Error(
+            "The status response was incomplete. Check this same request again; it has not been submitted again.",
+          );
+        if (
+          version !== viewVersion.current ||
+          statusRequest.current !== controller
+        )
+          return;
         setJob(next);
-        setError("");
+        setHistory((items) =>
+          items.map((item) => (item.id === next.id ? next : item)),
+        );
         if (!active(next)) {
           notifySessionChanged();
           void load().catch(() => {});
         }
       } catch (failure) {
-        if (version === viewVersion.current)
-          setError(
-            failure instanceof Error
-              ? failure.message
-              : "Could not check this request. Your video has not been submitted again.",
+        if (
+          version === viewVersion.current &&
+          statusRequest.current === controller
+        )
+          setCheckError(
+            controller.signal.aborted
+              ? "This status check timed out. Your existing request is preserved. Check it again when you’re ready; checking does not charge more credits."
+              : failure instanceof Error
+                ? failure.message
+                : "Could not check this request. Your video has not been submitted again.",
           );
       } finally {
-        if (version === viewVersion.current) setChecking(false);
+        clearTimeout(timeout);
+        if (statusRequest.current === controller) {
+          statusRequest.current = null;
+          setChecking(false);
+        }
       }
     },
     [load],
@@ -186,11 +239,14 @@ function VideoWorkspace() {
   useEffect(
     () => () => {
       if (blobUrl.current) URL.revokeObjectURL(blobUrl.current);
+      statusRequest.current?.abort();
+      statusRequest.current = null;
     },
     [],
   );
   const jobId = job?.id,
-    jobStatus = job?.status;
+    jobStatus = job?.status,
+    jobErrorCode = job?.errorCode;
   useEffect(() => {
     if (jobId && window.matchMedia("(max-width: 760px)").matches) {
       previewPanel.current?.scrollIntoView({
@@ -204,6 +260,8 @@ function VideoWorkspace() {
   useEffect(() => {
     if (
       !jobId ||
+      !!checkError ||
+      (!!jobErrorCode && jobErrorCode !== "VIDEO_SAVING") ||
       !["reserved", "submitting", "queued", "processing"].includes(
         jobStatus || "",
       )
@@ -223,7 +281,7 @@ function VideoWorkspace() {
       });
     }, 8000);
     return () => clearInterval(timer);
-  }, [jobId, jobStatus, check]);
+  }, [jobId, jobStatus, jobErrorCode, checkError, check]);
   async function choosePhoto(photo?: File) {
     if (!photo || locked) return;
     setError("");
@@ -265,7 +323,7 @@ function VideoWorkspace() {
     }
   }
   async function chooseReference(clip?: File) {
-    if (!clip) return;
+    if (!clip || locked) return;
     if (
       clip.type !== "video/mp4" ||
       !clip.size ||
@@ -315,6 +373,7 @@ function VideoWorkspace() {
       return;
     }
     lock.current = true;
+    cancelCheck();
     setBusy(true);
     setError("");
     const version = ++viewVersion.current;
@@ -371,6 +430,7 @@ function VideoWorkspace() {
     }
   }
   function startAnother() {
+    cancelCheck();
     ++viewVersion.current;
     setJob(null);
     remember("");
@@ -382,6 +442,7 @@ function VideoWorkspace() {
   async function remove() {
     if (!job || lock.current) return;
     lock.current = true;
+    cancelCheck();
     setBusy(true);
     setError("");
     try {
@@ -419,6 +480,14 @@ function VideoWorkspace() {
       </div>
       <div className="video-columns">
         <form className="video-controls" onSubmit={generate}>
+          {active(job) && (
+            <p className="video-draft-note" role="status">
+              You can choose a photo and movement for your next video here.
+              Request {job!.id.slice(0, 8)} is still pending; these changes stay
+              on your device. Generation stays paused until that request is
+              resolved.
+            </p>
+          )}
           <fieldset disabled={locked}>
             <legend>
               <span>01</span> Choose your movement
@@ -582,7 +651,12 @@ function VideoWorkspace() {
           <button
             type="submit"
             className="primary video-generate"
-            disabled={locked || available !== true || !!session?.billingHold}
+            disabled={
+              locked ||
+              active(job) ||
+              available !== true ||
+              !!session?.billingHold
+            }
           >
             {busy ? (
               <LoaderCircle className="spin" size={18} />
@@ -694,16 +768,16 @@ function VideoWorkspace() {
               <div className="video-screen video-waiting">
                 <div className="video-wait-icon">
                   {active(job) &&
-                  (!recovery ||
-                    checking ||
-                    job.errorCode === "VIDEO_SAVING") ? (
+                  (checking ||
+                    (!checkError &&
+                      (!recovery || job.errorCode === "VIDEO_SAVING"))) ? (
                     <LoaderCircle size={32} className="spin" />
                   ) : (
                     <Film size={32} />
                   )}
                 </div>
                 <h3>
-                  {recovery?.title ||
+                  {(checkError ? "Status check paused." : recovery?.title) ||
                     (
                       {
                         reserved: "Your scene is getting ready.",
@@ -726,6 +800,12 @@ function VideoWorkspace() {
                           ? "The outcome is not confirmed. Your credits stay reserved. Check this same request; we never automatically generate again."
                           : "This can take several minutes. You can leave this page and find the request in Your recent videos when you return.")}
                 </p>
+                {checkError && <p role="alert">{checkError}</p>}
+                {job.errorCode && job.errorCode !== "VIDEO_SAVING" && (
+                  <p>
+                    Support code: <code>{job.errorCode}</code>
+                  </p>
+                )}
                 {active(job) && (
                   <button
                     className="secondary"
@@ -872,6 +952,7 @@ function VideoWorkspace() {
                 disabled={busy}
                 aria-pressed={job?.id === item.id}
                 onClick={() => {
+                  cancelCheck();
                   ++viewVersion.current;
                   setJob(item);
                   setPreset(item.preset);

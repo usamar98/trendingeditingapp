@@ -191,7 +191,13 @@ test("simulated lost submission response recovers with GET only", async ({
     return r.fulfill({ json: { available: true, jobs: [] } });
   });
   await page.route("**/api/videos/*", (r) =>
-    r.fulfill({ json: { ...result, status: "failed" } }),
+    r.fulfill({
+      json: {
+        ...result,
+        id: new URL(r.request().url()).pathname.split("/").pop(),
+        status: "failed",
+      },
+    }),
   );
   await page.goto("/tools/ai-photo-to-video");
   await upload(page);
@@ -215,7 +221,8 @@ test("simulated lost submission response recovers with GET only", async ({
 
 test("simulated saved request recovers after a delivery failure without another charge", async ({
   page,
-}) => {
+}, info) => {
+  await page.clock.install();
   await setup(page);
   let posts = 0;
   let checks = 0;
@@ -275,6 +282,24 @@ test("simulated saved request recovers after a delivery failure without another 
   await expect(
     page.locator("details").filter({ hasText: "Request ID:" }),
   ).toContainText("VIDEO_CDN_AUTH_UNAVAILABLE");
+  await upload(page);
+  await page.getByRole("radio", { name: /Golden Breeze/ }).check();
+  await expect(
+    page.getByText(/You can choose a photo and movement for your next video/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Video request in progress" }),
+  ).toBeDisabled();
+  await expect(
+    page.locator("details").filter({ hasText: "Request ID:" }),
+  ).toContainText("Movement: Photo Comes Alive");
+  await page.clock.fastForward(24_000);
+  expect(checks).toBe(0); // A persistent delivery error pauses automatic polling.
+  expect(posts).toBe(0); // Selecting a draft never submits or replaces the pending job.
+  await page.screenshot({
+    path: `test-results/${info.project.name}-video-recovery-draft.png`,
+    fullPage: true,
+  });
   await page.getByRole("button", { name: "Check video status" }).click();
   await expect(
     page.getByRole("button", { name: "Check video status" }),
@@ -291,6 +316,111 @@ test("simulated saved request recovers after a delivery failure without another 
   await expect(page.getByRole("link", { name: "Download MP4" })).toBeVisible();
   expect(posts).toBe(0);
   expect(checks).toBeGreaterThanOrEqual(2);
+});
+
+test("a hung simulated status check times out, unlocks checking and does not retry itself", async ({
+  page,
+}) => {
+  await setup(page);
+  await page.clock.install();
+  const pending = {
+    ...result,
+    status: "queued",
+    errorCode: "VIDEO_RESULT_UNAVAILABLE",
+  };
+  let posts = 0,
+    checks = 0;
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/videos", (r) => {
+    if (r.request().method() === "POST") posts++;
+    return r.fulfill({ json: { available: true, jobs: [pending] } });
+  });
+  await page.route(`**/api/videos/${id}`, async (r) => {
+    checks++;
+    if (checks === 1) await held;
+    await r.fulfill({ json: pending }).catch(() => {});
+  });
+  await page.goto("/tools/ai-photo-to-video");
+  await page.getByRole("button", { name: "Check video status" }).click();
+  await expect(page.getByRole("button", { name: "Checking…" })).toBeDisabled();
+  await expect.poll(() => checks).toBe(1);
+  await page.clock.fastForward(46_000);
+  await expect(page.locator(".video-waiting [role=alert]")).toContainText(
+    "status check timed out",
+  );
+  await expect(
+    page.getByRole("button", { name: "Check video status" }),
+  ).toBeEnabled();
+  await page.clock.fastForward(24_000);
+  expect(checks).toBe(1);
+  await upload(page);
+  await page.getByRole("button", { name: "Check video status" }).click();
+  await expect.poll(() => checks).toBe(2);
+  await expect(
+    page.getByRole("button", { name: "Check video status" }),
+  ).toBeEnabled();
+  expect(posts).toBe(0);
+  release();
+});
+
+test("switching simulated requests clears checking and ignores the previous response", async ({
+  page,
+}) => {
+  await setup(page);
+  const first = {
+    ...result,
+    status: "uncertain",
+    errorCode: "VIDEO_RESULT_UNAVAILABLE",
+  };
+  const second = {
+    ...first,
+    id: "d224f1a6-755f-4d36-b7b4-0708fb532149",
+    preset: "memory",
+  };
+  let settled = false;
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/api/videos", (r) =>
+    r.fulfill({
+      json: {
+        available: true,
+        jobs: [first, { ...second, status: settled ? "failed" : "uncertain" }],
+      },
+    }),
+  );
+  await page.route(`**/api/videos/${id}`, async (r) => {
+    await held;
+    await r.fulfill({ json: result }).catch(() => {});
+  });
+  await page.route(`**/api/videos/${second.id}`, (r) => {
+    settled = true;
+    return r.fulfill({ json: { ...second, status: "failed" } });
+  });
+  await page.goto("/tools/ai-photo-to-video");
+  await page.getByRole("button", { name: "Check video status" }).click();
+  await expect(page.getByRole("button", { name: "Checking…" })).toBeDisabled();
+  await page
+    .getByRole("button", { name: /Photo Comes Alive.*uncertain/ })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Check video status" }),
+  ).toBeEnabled();
+  await page.getByRole("button", { name: "Check video status" }).click();
+  await expect(
+    page.getByText(
+      /The generation failed. Your reserved credits have been restored/,
+    ),
+  ).toBeVisible();
+  release();
+  await expect(page.getByRole("link", { name: "Download MP4" })).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: /Photo Comes Alive.*failed/ }),
+  ).toHaveAttribute("aria-pressed", "true");
 });
 test("simulated motion-reference submission shows 90 credits before dispatch", async ({
   page,
